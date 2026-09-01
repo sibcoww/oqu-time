@@ -17,6 +17,7 @@ public partial class MainViewModel : ViewModelBase
     public MainViewModel(INavigationService navigationService)
     {
         _navigationService = navigationService;
+        NavigationItems.Add(new NavigationItem("Группы", NavigateToCommand<GroupsViewModel>()));
 
         NavigationItems.Add(new NavigationItem("Главная", NavigateToCommand<HomeViewModel>()));
         NavigationItems.Add(new NavigationItem("Школа", NavigateToCommand<SchoolViewModel>()));

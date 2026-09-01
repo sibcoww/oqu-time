@@ -20,6 +20,9 @@
         <DataTemplate DataType="{x:Type viewmodels:ClassesViewModel}">
             <views:ClassesView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type viewmodels:GroupsViewModel}">
+            <views:GroupsView />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:TeachersViewModel}">
             <views:TeachersView />
         </DataTemplate>

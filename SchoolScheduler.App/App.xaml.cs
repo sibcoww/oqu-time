@@ -92,6 +92,7 @@ public partial class App : Application
         services.AddTransient<ISchoolClassService, SchoolClassService>();
         services.AddTransient<ITeacherService, TeacherService>();
         services.AddTransient<ICatalogService, CatalogService>();
+        services.AddTransient<IGroupService, GroupService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();
@@ -99,6 +100,7 @@ public partial class App : Application
         services.AddTransient<HomeViewModel>();
         services.AddTransient<SchoolViewModel>();
         services.AddTransient<BulkCreateClassesViewModel>();
+        services.AddTransient<GroupsViewModel>();
         services.AddTransient<ClassesViewModel>(sp => new ClassesViewModel(
             sp.GetRequiredService<ISchoolClassService>(),
             sp.GetRequiredService<IDialogService>(),

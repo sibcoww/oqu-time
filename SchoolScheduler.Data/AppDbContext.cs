@@ -10,6 +10,7 @@ public class AppDbContext : DbContext
     public DbSet<School> Schools => Set<School>();
     public DbSet<AcademicYear> AcademicYears => Set<AcademicYear>();
     public DbSet<SchoolClass> SchoolClasses => Set<SchoolClass>();
+    public DbSet<SchoolGroup> SchoolGroups => Set<SchoolGroup>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
     public DbSet<TeacherAvailability> TeacherAvailabilities => Set<TeacherAvailability>();
     public DbSet<Subject> Subjects => Set<Subject>();
@@ -38,6 +39,19 @@ public class AppDbContext : DbContext
             .WithMany(x => x.Availability)
             .HasForeignKey(x => x.RoomId)
             .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<SchoolGroup>()
+            .HasIndex(x => new { x.ClassId, x.Name })
+            .IsUnique();
+        modelBuilder.Entity<SchoolGroup>()
+            .HasOne(x => x.Class)
+            .WithMany()
+            .HasForeignKey(x => x.ClassId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<SchoolGroup>()
+            .HasOne(x => x.Subject)
+            .WithMany()
+            .HasForeignKey(x => x.SubjectId)
+            .OnDelete(DeleteBehavior.SetNull);
         // Дополнительные настройки для связей, если понадобятся, можно добавить здесь
     }
 }
