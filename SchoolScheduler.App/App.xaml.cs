@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using SchoolScheduler.App.Services;
 using SchoolScheduler.App.ViewModels;
+using SchoolScheduler.App.Views;
+using SchoolScheduler.Data;
 using System.Windows.Threading;
 
 namespace SchoolScheduler.App;
@@ -30,13 +33,30 @@ public partial class App : Application
         e.Handled = true;
     }
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
         var services = new ServiceCollection();
         ConfigureServices(services);
         _serviceProvider = services.BuildServiceProvider();
+
+        // Check if school setup is required
+        var setupService = _serviceProvider.GetRequiredService<ISchoolSetupService>();
+        bool isConfigured = await setupService.IsSchoolConfiguredAsync();
+
+        if (!isConfigured)
+        {
+            var setupWindow = _serviceProvider.GetRequiredService<SetupWizardWindow>();
+            setupWindow.DataContext = _serviceProvider.GetRequiredService<SetupWizardViewModel>();
+
+            bool? result = setupWindow.ShowDialog();
+            if (result != true)
+            {
+                Shutdown();
+                return;
+            }
+        }
 
         var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
         var mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();
@@ -52,8 +72,13 @@ public partial class App : Application
 
     private void ConfigureServices(IServiceCollection services)
     {
+        // DbContext
+        services.AddDbContextFactory<AppDbContext>(options =>
+            options.UseSqlite("Data Source=school.db"));
+
         // Views
         services.AddTransient<MainWindow>();
+        services.AddTransient<SetupWizardWindow>();
 
         // Services
         services.AddSingleton<IDialogService, DialogService>();
@@ -62,9 +87,11 @@ public partial class App : Application
             var mainViewModel = sp.GetRequiredService<MainViewModel>();
             return new NavigationService(sp, vm => mainViewModel.SetCurrentViewModel(vm));
         });
+        services.AddTransient<ISchoolSetupService, SchoolSetupService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();
+        services.AddTransient<SetupWizardViewModel>();
         services.AddTransient<HomeViewModel>();
         services.AddTransient<SchoolViewModel>();
         services.AddTransient<ClassesViewModel>();

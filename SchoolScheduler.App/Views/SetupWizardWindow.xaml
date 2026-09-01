@@ -1,0 +1,130 @@
+<Window x:Class="SchoolScheduler.App.Views.SetupWizardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:converters="clr-namespace:SchoolScheduler.App.Converters"
+        mc:Ignorable="d"
+        Title="Первоначальная настройка" Height="450" Width="600" WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Настройка новой школы" FontSize="20" FontWeight="Bold" Margin="0,0,0,20" />
+
+        <!-- Content Panels based on CurrentStep -->
+        <ContentControl Grid.Row="1">
+            <ContentControl.Style>
+                <Style TargetType="ContentControl">
+                    <Style.Triggers>
+                        <!-- Step 0: SchoolInfo -->
+                        <DataTrigger Binding="{Binding CurrentStep}" Value="SchoolInfo">
+                            <Setter Property="ContentTemplate">
+                                <Setter.Value>
+                                    <DataTemplate>
+                                        <StackPanel>
+                                            <TextBlock Text="Название школы:" />
+                                            <TextBox Text="{Binding DataContext.SchoolName, RelativeSource={RelativeSource AncestorType=Window}, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,15" />
+
+                                            <TextBlock Text="Регион:" />
+                                            <TextBox Text="{Binding DataContext.Region, RelativeSource={RelativeSource AncestorType=Window}, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,15" />
+
+                                            <CheckBox IsChecked="{Binding DataContext.UseRegionalNorms, RelativeSource={RelativeSource AncestorType=Window}}" Content="Использовать нормы региона (РК)" Margin="0,5,0,15" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </DataTrigger>
+
+                        <!-- Step 1: AcademicYear -->
+                        <DataTrigger Binding="{Binding CurrentStep}" Value="AcademicYear">
+                            <Setter Property="ContentTemplate">
+                                <Setter.Value>
+                                    <DataTemplate>
+                                        <StackPanel>
+                                            <TextBlock Text="Учебный год:" />
+                                            <TextBox Text="{Binding DataContext.AcademicYearName, RelativeSource={RelativeSource AncestorType=Window}, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,15" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </DataTrigger>
+
+                        <!-- Step 2: WorkWeek -->
+                        <DataTrigger Binding="{Binding CurrentStep}" Value="WorkWeek">
+                            <Setter Property="ContentTemplate">
+                                <Setter.Value>
+                                    <DataTemplate>
+                                        <StackPanel>
+                                            <TextBlock Text="Дней в учебной неделе:" />
+                                            <ComboBox ItemsSource="{Binding DataContext.DaysPerWeekOptions, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                                      SelectedItem="{Binding DataContext.DaysPerWeek, RelativeSource={RelativeSource AncestorType=Window}}" Margin="0,5,0,15" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </DataTrigger>
+
+                        <!-- Step 3: ShiftsCount -->
+                        <DataTrigger Binding="{Binding CurrentStep}" Value="ShiftsCount">
+                            <Setter Property="ContentTemplate">
+                                <Setter.Value>
+                                    <DataTemplate>
+                                        <StackPanel>
+                                            <TextBlock Text="Количество смен:" />
+                                            <ComboBox ItemsSource="{Binding DataContext.ShiftsCountOptions, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                                      SelectedItem="{Binding DataContext.ShiftsCount, RelativeSource={RelativeSource AncestorType=Window}}" Margin="0,5,0,15" />
+
+                                            <TextBlock Text="Уроков в смене (в среднем):" />
+                                            <TextBox Text="{Binding DataContext.LessonsPerShift, RelativeSource={RelativeSource AncestorType=Window}, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,15" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </DataTrigger>
+
+                        <!-- Step 4: Finalize -->
+                        <DataTrigger Binding="{Binding CurrentStep}" Value="Finalize">
+                            <Setter Property="ContentTemplate">
+                                <Setter.Value>
+                                    <DataTemplate>
+                                        <StackPanel>
+                                            <TextBlock Text="Готово! Нажмите Завершить для сохранения и перехода в главное меню." TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ContentControl.Style>
+        </ContentControl>
+
+        <!-- Navigation Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <!-- Instead of using inverted, we can just use triggers or directly bind to !IsFirstStep using another converter, but since we didn't add the InverseBoolean to Resources we'll do it or rewrite: -->
+            <Button Content="Назад" Command="{Binding PreviousStepCommand}" Width="100" Margin="0,0,10,0">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsFirstStep}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="Далее" Command="{Binding NextStepCommand}" Visibility="{Binding IsNotLastStep, Converter={StaticResource BooleanToVisibilityConverter}}" Width="100"/>
+            <Button Content="Завершить" Command="{Binding FinishCommand}" CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}" Visibility="{Binding IsLastStep, Converter={StaticResource BooleanToVisibilityConverter}}" Width="100"/>
+        </StackPanel>
+    </Grid>
+</Window>
