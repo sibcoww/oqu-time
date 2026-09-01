@@ -14,6 +14,7 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
         var variables = new Dictionary<(int DemandIndex, int SlotId), BoolVar>();
         var teacherAvailability = Availability(problem, ResourceKind.Teacher);
         var classAvailability = Availability(problem, ResourceKind.Class);
+        var roomAvailability = Availability(problem, ResourceKind.Room);
 
         for (var demandIndex = 0; demandIndex < problem.Demands.Count; demandIndex++)
         {
@@ -24,7 +25,7 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
                 var variable = model.NewBoolVar($"d{demandIndex}_s{slot.Id}");
                 variables[(demandIndex, slot.Id)] = variable;
                 demandVariables.Add(variable);
-                if (!IsAllowed(demand, slot, teacherAvailability, classAvailability)) model.Add(variable == 0);
+                if (!IsAllowed(demand, slot, teacherAvailability, classAvailability, roomAvailability)) model.Add(variable == 0);
             }
             model.Add(LinearExpr.Sum(demandVariables) == decimal.ToInt32(demand.WeeklyHours));
         }
@@ -32,9 +33,19 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
         foreach (var group in problem.Demands.Select((d, i) => (Demand: d, Index: i)).GroupBy(x => x.Demand.Resources.TeacherId))
             foreach (var slot in problem.TimeSlots)
                 model.Add(LinearExpr.Sum(group.Select(x => variables[(x.Index, slot.Id)])) <= 1);
-        foreach (var group in problem.Demands.Select((d, i) => (Demand: d, Index: i)).GroupBy(x => x.Demand.Resources.ClassId))
+        foreach (var classGroup in problem.Demands.Select((d, i) => (Demand: d, Index: i)).GroupBy(x => x.Demand.Resources.ClassId))
             foreach (var slot in problem.TimeSlots)
-                model.Add(LinearExpr.Sum(group.Select(x => variables[(x.Index, slot.Id)])) <= 1);
+            {
+                var wholeClass = classGroup.Where(x => !x.Demand.Resources.GroupId.HasValue).ToList();
+                if (wholeClass.Count > 0) model.Add(LinearExpr.Sum(wholeClass.Select(x => variables[(x.Index, slot.Id)])) <= 1);
+                foreach (var lessonGroup in classGroup.Where(x => x.Demand.Resources.GroupId.HasValue)
+                             .GroupBy(x => x.Demand.Resources.GroupId!.Value))
+                    model.Add(LinearExpr.Sum(wholeClass.Concat(lessonGroup).Select(x => variables[(x.Index, slot.Id)])) <= 1);
+            }
+        foreach (var roomGroup in problem.Demands.Select((d, i) => (Demand: d, Index: i))
+                     .Where(x => x.Demand.Resources.RoomId.HasValue).GroupBy(x => x.Demand.Resources.RoomId!.Value))
+            foreach (var slot in problem.TimeSlots)
+                model.Add(LinearExpr.Sum(roomGroup.Select(x => variables[(x.Index, slot.Id)])) <= 1);
 
         foreach (var fixedAssignment in problem.HardConstraints.OfType<FixedAssignmentConstraint>())
         {
@@ -49,7 +60,7 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
         };
         var status = solver.Solve(model);
         if (status is not CpSolverStatus.Feasible and not CpSolverStatus.Optimal)
-            return Infeasible(BuildInfeasibleDiagnostics(problem, teacherAvailability, classAvailability, status));
+            return Infeasible(BuildInfeasibleDiagnostics(problem, teacherAvailability, classAvailability, roomAvailability, status));
 
         var lessons = new List<ScheduledLesson>();
         for (var demandIndex = 0; demandIndex < problem.Demands.Count; demandIndex++)
@@ -68,11 +79,13 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
 
     private static bool IsAllowed(LessonDemand demand, TimeSlot slot,
         IReadOnlyDictionary<int, IReadOnlySet<int>> teacherAvailability,
-        IReadOnlyDictionary<int, IReadOnlySet<int>> classAvailability)
+        IReadOnlyDictionary<int, IReadOnlySet<int>> classAvailability,
+        IReadOnlyDictionary<int, IReadOnlySet<int>> roomAvailability)
     {
         if (slot.IsZeroLesson && !demand.AllowZeroLesson) return false;
         if (teacherAvailability.TryGetValue(demand.Resources.TeacherId, out var teacherSlots) && !teacherSlots.Contains(slot.Id)) return false;
         if (classAvailability.TryGetValue(demand.Resources.ClassId, out var classSlots) && !classSlots.Contains(slot.Id)) return false;
+        if (demand.Resources.RoomId.HasValue && roomAvailability.TryGetValue(demand.Resources.RoomId.Value, out var roomSlots) && !roomSlots.Contains(slot.Id)) return false;
         return true;
     }
 
@@ -91,12 +104,13 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
 
     private static IReadOnlyList<string> BuildInfeasibleDiagnostics(SchedulingProblem problem,
         IReadOnlyDictionary<int, IReadOnlySet<int>> teacherAvailability,
-        IReadOnlyDictionary<int, IReadOnlySet<int>> classAvailability, CpSolverStatus status)
+        IReadOnlyDictionary<int, IReadOnlySet<int>> classAvailability,
+        IReadOnlyDictionary<int, IReadOnlySet<int>> roomAvailability, CpSolverStatus status)
     {
         var diagnostics = new List<string>();
         foreach (var demand in problem.Demands)
         {
-            var allowed = problem.TimeSlots.Count(slot => IsAllowed(demand, slot, teacherAvailability, classAvailability));
+            var allowed = problem.TimeSlots.Count(slot => IsAllowed(demand, slot, teacherAvailability, classAvailability, roomAvailability));
             if (allowed < demand.WeeklyHours) diagnostics.Add($"Нагрузка #{demand.Id} требует {demand.WeeklyHours:0} уроков, но имеет только {allowed} доступных слотов.");
         }
         foreach (var teacher in problem.Demands.GroupBy(x => x.Resources.TeacherId))
@@ -104,6 +118,12 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
             var required = teacher.Sum(x => x.WeeklyHours);
             var available = teacherAvailability.TryGetValue(teacher.Key, out var slots) ? slots.Count : problem.TimeSlots.Count;
             if (required > available) diagnostics.Add($"Учителю #{teacher.Key} требуется {required:0} уроков, но доступно только {available} слотов.");
+        }
+        foreach (var room in problem.Demands.Where(x => x.Resources.RoomId.HasValue).GroupBy(x => x.Resources.RoomId!.Value))
+        {
+            var required = room.Sum(x => x.WeeklyHours);
+            var available = roomAvailability.TryGetValue(room.Key, out var slots) ? slots.Count : problem.TimeSlots.Count;
+            if (required > available) diagnostics.Add($"Для кабинета #{room.Key} требуется {required:0} уроков, но доступно только {available} слотов.");
         }
         if (diagnostics.Count == 0) diagnostics.Add($"CP-SAT не нашёл допустимое расписание. Статус: {status}.");
         return diagnostics;

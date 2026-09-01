@@ -47,8 +47,77 @@ public sealed class CpSatScheduleGeneratorTests
         Assert.Contains(result.Diagnostics, x => x.Contains("правила дробных занятий"));
     }
 
-    private static LessonDemand Demand(int id, int teacher, int subject, int schoolClass, decimal hours) =>
-        new(id, hours, new(teacher, subject, schoolClass, null, null), false, false, string.Empty);
+    [Fact]
+    public void DatasetC_SameRoomCannotBeUsedByTwoLessonsAtOnce()
+    {
+        var problem = Problem([Demand(1, 1, 1, 1, 1, room: 10), Demand(2, 2, 2, 2, 1, room: 10)], Slots(1, 2));
+        var result = new CpSatScheduleGenerator().Generate(problem);
+        Assert.True(result.IsFeasible, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.Equal(2, result.Lessons.Select(x => x.TimeSlotId).Distinct().Count());
+    }
+
+    [Fact]
+    public void AssignedRoomAvailability_IsHardConstraint()
+    {
+        var slots = Slots(1, 2);
+        var problem = Problem([Demand(1, 1, 1, 1, 1, room: 10)], slots,
+            [new ResourceAvailabilityConstraint(ResourceKind.Room, 10, new HashSet<int> { slots[1].Id })]);
+        var result = new CpSatScheduleGenerator().Generate(problem);
+        Assert.True(result.IsFeasible);
+        Assert.Equal(slots[1].Id, Assert.Single(result.Lessons).TimeSlotId);
+    }
+
+    [Fact]
+    public void DatasetD_DifferentGroupsCanStudyInParallel()
+    {
+        var slots = Slots(1, 1);
+        var problem = Problem([
+            Demand(1, 1, 1, 1, 1, group: 101, room: 10),
+            Demand(2, 2, 1, 1, 1, group: 102, room: 11)
+        ], slots);
+        var result = new CpSatScheduleGenerator().Generate(problem);
+        Assert.True(result.IsFeasible, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.Equal(2, result.Lessons.Count);
+        Assert.Single(result.Lessons.Select(x => x.TimeSlotId).Distinct());
+    }
+
+    [Fact]
+    public void WholeClassLessonConflictsWithEveryGroupLesson()
+    {
+        var result = new CpSatScheduleGenerator().Generate(Problem([
+            Demand(1, 1, 1, 1, 1), Demand(2, 2, 2, 1, 1, group: 101)
+        ], Slots(1, 1)));
+        Assert.False(result.IsFeasible);
+    }
+
+    [Fact]
+    public void ClassShiftAvailability_RestrictsLessonToItsShiftSlots()
+    {
+        var slots = new List<TimeSlot>
+        {
+            new(1, 1, 1, 1, TimeSpan.Zero, TimeSpan.Zero, false),
+            new(2, 2, 1, 1, TimeSpan.Zero, TimeSpan.Zero, false)
+        };
+        var problem = Problem([Demand(1, 1, 1, 1, 1)], slots,
+            [new ResourceAvailabilityConstraint(ResourceKind.Class, 1, new HashSet<int> { 2 })]);
+        var result = new CpSatScheduleGenerator().Generate(problem);
+        Assert.True(result.IsFeasible);
+        Assert.Equal(2, Assert.Single(result.Lessons).TimeSlotId);
+    }
+
+    [Fact]
+    public void FixedLesson_IsPlacedIntoRequiredSlot()
+    {
+        var problem = Problem([Demand(7, 1, 1, 1, 1)], Slots(2, 2),
+            [new FixedAssignmentConstraint(7, 4)]);
+        var result = new CpSatScheduleGenerator().Generate(problem);
+        Assert.True(result.IsFeasible);
+        Assert.Equal(4, Assert.Single(result.Lessons).TimeSlotId);
+    }
+
+    private static LessonDemand Demand(int id, int teacher, int subject, int schoolClass, decimal hours,
+        int? group = null, int? room = null) =>
+        new(id, hours, new(teacher, subject, schoolClass, group, room), false, false, string.Empty);
 
     private static List<TimeSlot> Slots(int days, int lessons) =>
         (from day in Enumerable.Range(1, days) from lesson in Enumerable.Range(1, lessons)
