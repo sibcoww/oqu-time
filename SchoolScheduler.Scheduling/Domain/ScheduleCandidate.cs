@@ -3,7 +3,25 @@ namespace SchoolScheduler.Scheduling.Domain;
 public sealed record ScheduledLesson(int LessonDemandId, int OccurrenceIndex, int TimeSlotId);
 
 public sealed record ScheduleCandidate(IReadOnlyList<ScheduledLesson> Lessons, ScheduleScore Score,
-    bool IsFeasible, IReadOnlyList<string> Diagnostics);
+    bool IsFeasible, IReadOnlyList<string> Diagnostics, InfeasibilityReport? Infeasibility = null);
+
+public sealed record InfeasibilityReport(IReadOnlyList<InfeasibilityReason> Reasons)
+{
+    public bool HasSpecificReasons => Reasons.Any(x => x.Category != InfeasibilityCategory.Unknown);
+}
+
+public sealed record InfeasibilityReason(string Code, InfeasibilityCategory Category,
+    ResourceKind? ResourceKind, int? ResourceId, int? LessonDemandId,
+    string Message, string Suggestion);
+
+public enum InfeasibilityCategory
+{
+    InvalidDemand,
+    Availability,
+    Capacity,
+    FixedAssignmentConflict,
+    Unknown
+}
 
 public sealed record ScheduleScore(int TotalPenalty, IReadOnlyDictionary<string, int> Penalties)
 {

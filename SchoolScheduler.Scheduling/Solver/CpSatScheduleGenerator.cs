@@ -1,5 +1,6 @@
 using Google.OrTools.Sat;
 using SchoolScheduler.Scheduling.Domain;
+using SchoolScheduler.Scheduling.Diagnostics;
 
 namespace SchoolScheduler.Scheduling.Solver;
 
@@ -7,8 +8,9 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
 {
     public ScheduleCandidate Generate(SchedulingProblem problem, TimeSpan? timeLimit = null)
     {
-        var diagnostics = ValidateDiscreteProblem(problem);
-        if (diagnostics.Count > 0) return Infeasible(diagnostics);
+        var analyzer = new InfeasibilityAnalyzer();
+        var preflight = analyzer.Analyze(problem, false);
+        if (preflight.Reasons.Count > 0) return Infeasible(preflight);
 
         var model = new CpModel();
         var variables = new Dictionary<(int DemandIndex, int SlotId), BoolVar>();
@@ -64,7 +66,7 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
         };
         var status = solver.Solve(model);
         if (status is not CpSolverStatus.Feasible and not CpSolverStatus.Optimal)
-            return Infeasible(BuildInfeasibleDiagnostics(problem, teacherAvailability, classAvailability, roomAvailability, status));
+            return Infeasible(analyzer.Analyze(problem));
 
         var lessons = new List<ScheduledLesson>();
         for (var demandIndex = 0; demandIndex < problem.Demands.Count; demandIndex++)
@@ -95,46 +97,6 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
         return true;
     }
 
-    private static List<string> ValidateDiscreteProblem(SchedulingProblem problem)
-    {
-        var diagnostics = new List<string>();
-        if (problem.TimeSlots.Count == 0) diagnostics.Add("Не задано ни одного временного слота.");
-        foreach (var demand in problem.Demands)
-        {
-            if (demand.WeeklyHours <= 0) diagnostics.Add($"Нагрузка #{demand.Id}: количество часов должно быть больше нуля.");
-            if (demand.WeeklyHours != decimal.Truncate(demand.WeeklyHours))
-                diagnostics.Add($"Нагрузка #{demand.Id}: {demand.WeeklyHours:0.##} часа нельзя распределить в недельной сетке без правила дробных занятий.");
-        }
-        return diagnostics;
-    }
-
-    private static IReadOnlyList<string> BuildInfeasibleDiagnostics(SchedulingProblem problem,
-        IReadOnlyDictionary<int, IReadOnlySet<int>> teacherAvailability,
-        IReadOnlyDictionary<int, IReadOnlySet<int>> classAvailability,
-        IReadOnlyDictionary<int, IReadOnlySet<int>> roomAvailability, CpSolverStatus status)
-    {
-        var diagnostics = new List<string>();
-        foreach (var demand in problem.Demands)
-        {
-            var allowed = problem.TimeSlots.Count(slot => IsAllowed(demand, slot, teacherAvailability, classAvailability, roomAvailability));
-            if (allowed < demand.WeeklyHours) diagnostics.Add($"Нагрузка #{demand.Id} требует {demand.WeeklyHours:0} уроков, но имеет только {allowed} доступных слотов.");
-        }
-        foreach (var teacher in problem.Demands.GroupBy(x => x.Resources.TeacherId))
-        {
-            var required = teacher.Sum(x => x.WeeklyHours);
-            var available = teacherAvailability.TryGetValue(teacher.Key, out var slots) ? slots.Count : problem.TimeSlots.Count;
-            if (required > available) diagnostics.Add($"Учителю #{teacher.Key} требуется {required:0} уроков, но доступно только {available} слотов.");
-        }
-        foreach (var room in problem.Demands.Where(x => x.Resources.RoomId.HasValue).GroupBy(x => x.Resources.RoomId!.Value))
-        {
-            var required = room.Sum(x => x.WeeklyHours);
-            var available = roomAvailability.TryGetValue(room.Key, out var slots) ? slots.Count : problem.TimeSlots.Count;
-            if (required > available) diagnostics.Add($"Для кабинета #{room.Key} требуется {required:0} уроков, но доступно только {available} слотов.");
-        }
-        if (diagnostics.Count == 0) diagnostics.Add($"CP-SAT не нашёл допустимое расписание. Статус: {status}.");
-        return diagnostics;
-    }
-
-    private static ScheduleCandidate Infeasible(IReadOnlyList<string> diagnostics) =>
-        new([], ScheduleScore.Empty, false, diagnostics);
+    private static ScheduleCandidate Infeasible(InfeasibilityReport report) =>
+        new([], ScheduleScore.Empty, false, report.Reasons.Select(x => x.Message).ToList(), report);
 }
