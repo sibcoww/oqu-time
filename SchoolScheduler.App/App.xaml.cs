@@ -11,6 +11,7 @@ using SchoolScheduler.ImportExport;
 using SchoolScheduler.Scheduling.Validation;
 using SchoolScheduler.Scheduling.Domain;
 using SchoolScheduler.Scheduling.Solver;
+using SchoolScheduler.Scheduling.Normative;
 
 namespace SchoolScheduler.App;
 
@@ -103,6 +104,8 @@ public partial class App : Application
         services.AddSingleton<IScheduleGenerator, CpSatScheduleGenerator>();
         services.AddTransient<IScheduleGenerationService, ScheduleGenerationService>();
         services.AddTransient<IProjectBackupService, ProjectBackupService>();
+        services.AddSingleton<INormativeRuleSet>(_ => KazakhstanRuleSet2026.Create());
+        services.AddTransient<INormativeValidationService, NormativeValidationService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();
