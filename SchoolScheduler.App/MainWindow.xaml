@@ -21,7 +21,7 @@
             <views:ClassesView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:TeachersViewModel}">
-            <TextBlock Text="Учителя" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
+            <views:TeachersView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:SubjectsViewModel}">
             <TextBlock Text="Предметы" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
