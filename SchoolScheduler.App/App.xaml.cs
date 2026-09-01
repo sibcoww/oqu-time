@@ -9,6 +9,8 @@ using SchoolScheduler.Data;
 using System.Windows.Threading;
 using SchoolScheduler.ImportExport;
 using SchoolScheduler.Scheduling.Validation;
+using SchoolScheduler.Scheduling.Domain;
+using SchoolScheduler.Scheduling.Solver;
 
 namespace SchoolScheduler.App;
 
@@ -100,6 +102,9 @@ public partial class App : Application
         services.AddSingleton<TeachingLoadExcelService>();
         services.AddSingleton<PreScheduleValidator>();
         services.AddTransient<IPreScheduleValidationService, PreScheduleValidationService>();
+        services.AddSingleton<SchedulingProblemFactory>();
+        services.AddSingleton<IScheduleGenerator, CpSatScheduleGenerator>();
+        services.AddTransient<IScheduleGenerationService, ScheduleGenerationService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();

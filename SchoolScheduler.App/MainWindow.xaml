@@ -39,7 +39,7 @@
             <views:ConstraintsView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:ScheduleViewModel}">
-            <TextBlock Text="Расписание" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
+            <views:ScheduleView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:ExportViewModel}">
             <TextBlock Text="Экспорт" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
