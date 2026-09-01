@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<TeacherAvailability> TeacherAvailabilities => Set<TeacherAvailability>();
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<Room> Rooms => Set<Room>();
+    public DbSet<RoomAvailability> RoomAvailabilities => Set<RoomAvailability>();
     public DbSet<Shift> Shifts => Set<Shift>();
     public DbSet<LessonPeriod> LessonPeriods => Set<LessonPeriod>();
     public DbSet<TeachingLoad> TeachingLoads => Set<TeachingLoad>();
@@ -28,6 +29,14 @@ public class AppDbContext : DbContext
             .HasOne(x => x.Teacher)
             .WithMany(x => x.Availability)
             .HasForeignKey(x => x.TeacherId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<RoomAvailability>()
+            .HasIndex(x => new { x.RoomId, x.DayOfWeek, x.LessonNumber })
+            .IsUnique();
+        modelBuilder.Entity<RoomAvailability>()
+            .HasOne(x => x.Room)
+            .WithMany(x => x.Availability)
+            .HasForeignKey(x => x.RoomId)
             .OnDelete(DeleteBehavior.Cascade);
         // Дополнительные настройки для связей, если понадобятся, можно добавить здесь
     }

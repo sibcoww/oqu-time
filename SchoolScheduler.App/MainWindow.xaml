@@ -24,10 +24,10 @@
             <views:TeachersView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:SubjectsViewModel}">
-            <TextBlock Text="Предметы" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
+            <views:SubjectsView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:RoomsViewModel}">
-            <TextBlock Text="Кабинеты" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
+            <views:RoomsView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:TeachingLoadViewModel}">
             <TextBlock Text="Нагрузка" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>

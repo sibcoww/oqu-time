@@ -91,6 +91,7 @@ public partial class App : Application
         services.AddTransient<ISchoolSetupService, SchoolSetupService>();
         services.AddTransient<ISchoolClassService, SchoolClassService>();
         services.AddTransient<ITeacherService, TeacherService>();
+        services.AddTransient<ICatalogService, CatalogService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();
