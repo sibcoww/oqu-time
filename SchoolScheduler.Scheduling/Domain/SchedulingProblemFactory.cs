@@ -1,0 +1,74 @@
+using SchoolScheduler.Core.Models;
+using SchoolScheduler.Scheduling.Validation;
+
+namespace SchoolScheduler.Scheduling.Domain;
+
+public sealed record SchedulingSource(
+    IReadOnlyCollection<TeachingLoad> Loads,
+    IReadOnlyCollection<SchoolClass> Classes,
+    IReadOnlyCollection<Subject> Subjects,
+    IReadOnlyCollection<LessonPeriod> LessonPeriods,
+    IReadOnlyCollection<TeacherAvailability> TeacherAvailability,
+    IReadOnlyCollection<RoomAvailability> RoomAvailability,
+    int DaysPerWeek,
+    IReadOnlyCollection<FixedLessonAssignment>? FixedLessons = null);
+
+public sealed class SchedulingProblemFactory
+{
+    public SchedulingProblem Create(SchedulingSource source)
+    {
+        var subjects = source.Subjects.ToDictionary(x => x.Id);
+        var classes = source.Classes.ToDictionary(x => x.Id);
+        var demands = source.Loads.Select(load => new LessonDemand(
+            load.Id, load.HoursPerWeek,
+            new(load.TeacherId, load.SubjectId, load.ClassId, load.GroupId, load.RoomId),
+            load.AllowZeroLesson,
+            subjects.TryGetValue(load.SubjectId, out var subject) && subject.AllowDoubleLessons,
+            load.Comment ?? string.Empty)).ToList();
+
+        var slots = new List<TimeSlot>();
+        var slotId = 1;
+        foreach (var period in source.LessonPeriods.OrderBy(x => x.ShiftId).ThenBy(x => x.Number))
+            for (var day = 1; day <= source.DaysPerWeek; day++)
+                slots.Add(new(slotId++, period.ShiftId, day, period.Number,
+                    period.StartTime, period.EndTime, period.Number == 0));
+
+        var hard = new List<HardConstraint>
+        {
+            new NoResourceOverlapConstraint(ResourceKind.Teacher),
+            new NoResourceOverlapConstraint(ResourceKind.Class),
+            new NoResourceOverlapConstraint(ResourceKind.Room)
+        };
+        foreach (var teacher in source.Loads.Select(x => x.TeacherId).Distinct())
+            hard.Add(new ResourceAvailabilityConstraint(ResourceKind.Teacher, teacher,
+                AllowedSlots(slots, source.TeacherAvailability.Where(x => x.TeacherId == teacher)
+                    .Select(x => (x.DayOfWeek, x.LessonNumber, x.IsAvailable)), null)));
+        foreach (var room in source.Loads.Where(x => x.RoomId.HasValue).Select(x => x.RoomId!.Value).Distinct())
+            hard.Add(new ResourceAvailabilityConstraint(ResourceKind.Room, room,
+                AllowedSlots(slots, source.RoomAvailability.Where(x => x.RoomId == room)
+                    .Select(x => (x.DayOfWeek, x.LessonNumber, x.IsAvailable)), null)));
+        foreach (var schoolClass in classes.Values)
+            hard.Add(new ResourceAvailabilityConstraint(ResourceKind.Class, schoolClass.Id,
+                slots.Where(x => x.ShiftId == schoolClass.ShiftId && x.LessonNumber <= schoolClass.MaxLessonsPerDay)
+                    .Select(x => x.Id).ToHashSet()));
+        foreach (var fixedLesson in source.FixedLessons ?? [])
+        {
+            var slot = slots.FirstOrDefault(x => x.DayOfWeek == fixedLesson.DayOfWeek && x.LessonNumber == fixedLesson.LessonNumber &&
+                classes.TryGetValue(fixedLesson.ClassId, out var schoolClass) && x.ShiftId == schoolClass.ShiftId);
+            if (slot is not null) hard.Add(new FixedAssignmentConstraint(fixedLesson.TeachingLoadId, slot.Id));
+        }
+
+        SoftConstraint[] soft = [new MinimizeTeacherGapsConstraint(), new BalanceClassDayConstraint(), new PreferEarlierLessonsConstraint()];
+        return new(demands, slots, hard, soft);
+    }
+
+    private static IReadOnlySet<int> AllowedSlots(IEnumerable<TimeSlot> slots,
+        IEnumerable<(int DayOfWeek, int LessonNumber, bool IsAvailable)> availability, int? shiftId)
+    {
+        var values = availability.ToList();
+        var eligible = shiftId.HasValue ? slots.Where(x => x.ShiftId == shiftId) : slots;
+        if (values.Count == 0) return eligible.Select(x => x.Id).ToHashSet();
+        return eligible.Where(slot => values.Any(x => x.DayOfWeek == slot.DayOfWeek &&
+            x.LessonNumber == slot.LessonNumber && x.IsAvailable)).Select(x => x.Id).ToHashSet();
+    }
+}
