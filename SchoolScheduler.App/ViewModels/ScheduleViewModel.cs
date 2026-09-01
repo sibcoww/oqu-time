@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SchoolScheduler.App.Services;
+using SchoolScheduler.ImportExport;
 using SchoolScheduler.Scheduling.Domain;
 
 namespace SchoolScheduler.App.ViewModels;
@@ -21,7 +23,8 @@ public sealed record ScheduleCell(int Day, int LessonNumber, ObservableCollectio
 public sealed record ScheduleGridRow(int LessonNumber, ScheduleCell Monday, ScheduleCell Tuesday, ScheduleCell Wednesday,
     ScheduleCell Thursday, ScheduleCell Friday, ScheduleCell Saturday);
 
-public partial class ScheduleViewModel(IScheduleGenerationService service, IDialogService dialogs) : ViewModelBase
+public partial class ScheduleViewModel(IScheduleGenerationService service, IDialogService dialogs,
+    ScheduleExcelService? excel = null, IFileDialogService? files = null) : ViewModelBase
 {
     private GeneratedSchedule? _schedule;
     private readonly HashSet<ScheduleLessonKey> _pinned = [];
@@ -117,6 +120,37 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
         SaveUndo();
         if (!_pinned.Add(item.Key)) _pinned.Remove(item.Key);
         Status = _pinned.Contains(item.Key) ? "Занятие закреплено." : "Закрепление снято."; RebuildGrid();
+    }
+
+    [RelayCommand]
+    private void Export()
+    {
+        if (_schedule is null || !_schedule.Candidate.IsFeasible || excel is null || files is null) return;
+        var path = files.ChooseExcelSavePath($"Расписание-{DateTime.Today:yyyy-MM-dd}.xlsx");
+        if (path is null) return;
+        try
+        {
+            var demands = _schedule.Problem.Demands.ToDictionary(x => x.Id);
+            var slots = _schedule.Problem.TimeSlots.ToDictionary(x => x.Id);
+            var rows = _schedule.Candidate.Lessons.Select(lesson =>
+            {
+                var demand = demands[lesson.LessonDemandId];
+                var slot = slots[lesson.TimeSlotId];
+                return new ScheduleExportRow(slot.DayOfWeek, slot.LessonNumber,
+                    _schedule.Classes.FirstOrDefault(x => x.Id == demand.Resources.ClassId)?.Name ?? $"Класс #{demand.Resources.ClassId}",
+                    demand.Resources.GroupId is int groupId ? _schedule.Groups.FirstOrDefault(x => x.Id == groupId)?.Name : null,
+                    _schedule.Subjects.FirstOrDefault(x => x.Id == demand.Resources.SubjectId)?.Name ?? $"Предмет #{demand.Resources.SubjectId}",
+                    _schedule.Teachers.FirstOrDefault(x => x.Id == demand.Resources.TeacherId)?.FullName ?? $"Учитель #{demand.Resources.TeacherId}",
+                    demand.Resources.RoomId is int roomId ? _schedule.Rooms.FirstOrDefault(x => x.Id == roomId)?.Name : null);
+            }).ToList();
+            excel.Export(path, rows);
+            Status = $"Расписание экспортировано: {Path.GetFileName(path)}";
+        }
+        catch (Exception ex)
+        {
+            Status = "Ошибка экспорта расписания.";
+            dialogs.ShowError($"Не удалось экспортировать расписание: {ex.Message}");
+        }
     }
 
     [RelayCommand]

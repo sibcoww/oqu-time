@@ -100,6 +100,7 @@ public partial class App : Application
         services.AddTransient<ITeachingLoadService, TeachingLoadService>();
         services.AddSingleton<IFileDialogService, FileDialogService>();
         services.AddSingleton<TeachingLoadExcelService>();
+        services.AddSingleton<ScheduleExcelService>();
         services.AddSingleton<PreScheduleValidator>();
         services.AddTransient<IPreScheduleValidationService, PreScheduleValidationService>();
         services.AddSingleton<SchedulingProblemFactory>();
