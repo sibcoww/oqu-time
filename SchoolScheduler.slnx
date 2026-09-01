@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="SchoolScheduler.App/SchoolScheduler.App.csproj" />
+  <Project Path="SchoolScheduler.Core/SchoolScheduler.Core.csproj" />
+  <Project Path="SchoolScheduler.Data/SchoolScheduler.Data.csproj" />
+  <Project Path="SchoolScheduler.ImportExport/SchoolScheduler.ImportExport.csproj" />
+  <Project Path="SchoolScheduler.Scheduling/SchoolScheduler.Scheduling.csproj" />
+  <Project Path="SchoolScheduler.Tests/SchoolScheduler.Tests.csproj" />
+</Solution>
