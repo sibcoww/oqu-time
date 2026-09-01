@@ -54,6 +54,10 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
                 model.Add(variable == 1);
         }
 
+        var penaltyTerms = SoftConstraintModelBuilder.Add(model, problem, variables);
+        if (penaltyTerms.Count > 0)
+            model.Minimize(LinearExpr.Sum(penaltyTerms.Select(x => LinearExpr.Term(x.Variable, x.Weight))));
+
         var solver = new CpSolver
         {
             StringParameters = $"max_time_in_seconds:{(timeLimit ?? TimeSpan.FromSeconds(10)).TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)} num_search_workers:8"
@@ -70,7 +74,9 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
                 if (solver.Value(variables[(demandIndex, slot.Id)]) == 1)
                     lessons.Add(new(problem.Demands[demandIndex].Id, occurrence++, slot.Id));
         }
-        return new(lessons, ScheduleScore.Empty, true, []);
+        var penalties = penaltyTerms.GroupBy(x => x.Code).ToDictionary(x => x.Key,
+            x => x.Sum(term => checked((int)solver.Value(term.Variable) * term.Weight)));
+        return new(lessons, new(penalties.Values.Sum(), penalties), true, []);
     }
 
     private static Dictionary<int, IReadOnlySet<int>> Availability(SchedulingProblem problem, ResourceKind kind) =>

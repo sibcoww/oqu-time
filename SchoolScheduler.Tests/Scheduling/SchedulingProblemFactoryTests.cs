@@ -24,6 +24,7 @@ public sealed class SchedulingProblemFactoryTests
         Assert.Equal(0.5m, demand.WeeklyHours);
         Assert.Equal("Исходное", demand.Comment);
         Assert.True(demand.AllowDoubleLessons);
+        Assert.Equal(1, demand.SubjectDifficulty);
         Assert.Equal(10, problem.TimeSlots.Count);
         Assert.Equal(4, demand.Resources.GroupId);
     }
@@ -47,7 +48,7 @@ public sealed class SchedulingProblemFactoryTests
         Assert.Equal((1, 2), problem.TimeSlots.Where(x => x.Id == teacherSlot)
             .Select(x => (x.DayOfWeek, x.LessonNumber)).Single());
         Assert.Single(problem.HardConstraints.OfType<FixedAssignmentConstraint>());
-        Assert.Equal(3, problem.SoftConstraints.Count);
+        Assert.Equal(6, problem.SoftConstraints.Count);
     }
 
     [Fact]

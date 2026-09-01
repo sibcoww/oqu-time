@@ -24,6 +24,7 @@ public sealed class SchedulingProblemFactory
             new(load.TeacherId, load.SubjectId, load.ClassId, load.GroupId, load.RoomId),
             load.AllowZeroLesson,
             subjects.TryGetValue(load.SubjectId, out var subject) && subject.AllowDoubleLessons,
+            subjects.TryGetValue(load.SubjectId, out subject) ? subject.Difficulty : 1,
             load.Comment ?? string.Empty)).ToList();
 
         var slots = new List<TimeSlot>();
@@ -58,7 +59,9 @@ public sealed class SchedulingProblemFactory
             if (slot is not null) hard.Add(new FixedAssignmentConstraint(fixedLesson.TeachingLoadId, slot.Id));
         }
 
-        SoftConstraint[] soft = [new MinimizeTeacherGapsConstraint(), new BalanceClassDayConstraint(), new PreferEarlierLessonsConstraint()];
+        SoftConstraint[] soft = [new MinimizeTeacherGapsConstraint(), new BalanceClassDayConstraint(),
+            new SpreadSubjectAcrossWeekConstraint(), new AvoidConsecutiveDifficultSubjectsConstraint(),
+            new AvoidEdgeLessonsConstraint(), new PreferEarlierLessonsConstraint()];
         return new(demands, slots, hard, soft);
     }
 

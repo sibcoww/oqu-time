@@ -12,6 +12,7 @@ public sealed record LessonDemand(
     ResourceRequirement Resources,
     bool AllowZeroLesson,
     bool AllowDoubleLessons,
+    int SubjectDifficulty,
     string Comment);
 
 public sealed record TimeSlot(int Id, int ShiftId, int DayOfWeek, int LessonNumber,
@@ -36,5 +37,13 @@ public sealed record BalanceClassDayConstraint(int Weight = 5)
     : SoftConstraint("BALANCE_CLASS_DAY", "Равномерно распределять уроки класса", Weight);
 public sealed record PreferEarlierLessonsConstraint(int Weight = 1)
     : SoftConstraint("PREFER_EARLIER_LESSONS", "Предпочитать более ранние уроки", Weight);
+public sealed record SpreadSubjectAcrossWeekConstraint(int Weight = 4)
+    : SoftConstraint("SPREAD_SUBJECT_WEEK", "Распределять один предмет по разным дням", Weight);
+public sealed record AvoidConsecutiveDifficultSubjectsConstraint(int DifficultyThreshold = 7, int Weight = 3)
+    : SoftConstraint("AVOID_CONSECUTIVE_DIFFICULT", "Не ставить тяжёлые предметы подряд", Weight);
+public sealed record AvoidEdgeLessonsConstraint(int Weight = 2)
+    : SoftConstraint("AVOID_EDGE_LESSONS", "Избегать нулевых и последних уроков", Weight);
+public sealed record PreferredTimeSlotsConstraint(int LessonDemandId, IReadOnlySet<int> PreferredTimeSlotIds, int Weight = 5)
+    : SoftConstraint("USER_TIME_PREFERENCE", $"Предпочтительные слоты нагрузки #{LessonDemandId}", Weight);
 
 public enum ResourceKind { Teacher, Class, Group, Room }
