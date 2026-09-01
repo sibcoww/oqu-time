@@ -79,6 +79,7 @@ public partial class App : Application
         // Views
         services.AddTransient<MainWindow>();
         services.AddTransient<SetupWizardWindow>();
+        services.AddTransient<BulkCreateClassesWindow>();
 
         // Services
         services.AddSingleton<IDialogService, DialogService>();
@@ -88,13 +89,24 @@ public partial class App : Application
             return new NavigationService(sp, vm => mainViewModel.SetCurrentViewModel(vm));
         });
         services.AddTransient<ISchoolSetupService, SchoolSetupService>();
+        services.AddTransient<ISchoolClassService, SchoolClassService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();
         services.AddTransient<SetupWizardViewModel>();
         services.AddTransient<HomeViewModel>();
         services.AddTransient<SchoolViewModel>();
-        services.AddTransient<ClassesViewModel>();
+        services.AddTransient<BulkCreateClassesViewModel>();
+        services.AddTransient<ClassesViewModel>(sp => new ClassesViewModel(
+            sp.GetRequiredService<ISchoolClassService>(),
+            sp.GetRequiredService<IDialogService>(),
+            () =>
+            {
+                var window = sp.GetRequiredService<BulkCreateClassesWindow>();
+                window.DataContext = sp.GetRequiredService<BulkCreateClassesViewModel>();
+                window.Owner = Current.MainWindow;
+                window.ShowDialog();
+            }));
         services.AddTransient<TeachersViewModel>();
         services.AddTransient<SubjectsViewModel>();
         services.AddTransient<RoomsViewModel>();

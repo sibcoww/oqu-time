@@ -2,7 +2,6 @@ namespace SchoolScheduler.App.ViewModels;
 
 public class HomeViewModel : ViewModelBase { }
 public class SchoolViewModel : ViewModelBase { }
-public class ClassesViewModel : ViewModelBase { }
 public class TeachersViewModel : ViewModelBase { }
 public class SubjectsViewModel : ViewModelBase { }
 public class RoomsViewModel : ViewModelBase { }

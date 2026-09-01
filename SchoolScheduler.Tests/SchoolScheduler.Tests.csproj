@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -23,6 +23,7 @@
     <ProjectReference Include="..\SchoolScheduler.Data\SchoolScheduler.Data.csproj" />
     <ProjectReference Include="..\SchoolScheduler.Scheduling\SchoolScheduler.Scheduling.csproj" />
     <ProjectReference Include="..\SchoolScheduler.ImportExport\SchoolScheduler.ImportExport.csproj" />
+    <ProjectReference Include="..\SchoolScheduler.App\SchoolScheduler.App.csproj" />
   </ItemGroup>
 
 </Project>

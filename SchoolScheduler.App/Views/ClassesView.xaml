@@ -1,0 +1,94 @@
+<UserControl x:Class="SchoolScheduler.App.Views.ClassesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewmodels="clr-namespace:SchoolScheduler.App.ViewModels"
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="800">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </UserControl.Resources>
+
+    <Grid Margin="10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*" />
+            <ColumnDefinition Width="1*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Classes List -->
+        <Border Grid.Column="0" BorderBrush="LightGray" BorderThickness="1" Margin="0,0,10,0" Padding="10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                    <TextBlock Text="Список классов" FontSize="18" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,20,0" />
+                    <Button Content="Добавить" Command="{Binding AddNewClassCommand}" Width="80" Margin="0,0,10,0"/>
+                    <Button Content="Массовое создание" Command="{Binding ShowBulkCreateCommand}" Width="130" />
+                </StackPanel>
+
+                <DataGrid Grid.Row="1" ItemsSource="{Binding Classes}" SelectedItem="{Binding SelectedClass}" 
+                          AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True" SelectionMode="Single">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Название" Binding="{Binding Name}" Width="100"/>
+                        <DataGridTextColumn Header="Параллель" Binding="{Binding Parallel}" Width="80"/>
+                        <DataGridTextColumn Header="Литера" Binding="{Binding Letter}" Width="80"/>
+                        <DataGridCheckBoxColumn Header="Активен" Binding="{Binding IsActive}" Width="80"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <!-- Editor Panel -->
+        <Border Grid.Column="1" BorderBrush="LightGray" BorderThickness="1" Padding="10">
+            <Grid>
+                <!-- Show editor only if a class is selected -->
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedClass}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Hidden" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Редактирование класса" FontSize="16" FontWeight="Bold" Margin="0,0,0,15" />
+
+                <StackPanel Grid.Row="1" DataContext="{Binding SelectedClass}">
+                    <TextBlock Text="Параллель (число):" />
+                    <TextBox Text="{Binding Parallel, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,10" />
+
+                    <TextBlock Text="Литера:" />
+                    <TextBox Text="{Binding Letter, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,10" />
+
+                    <TextBlock Text="Макс. уроков в день:" />
+                    <TextBox Text="{Binding MaxLessonsPerDay, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,10" />
+
+                    <TextBlock Text="Смена:" />
+                    <ComboBox ItemsSource="{Binding DataContext.Shifts, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                              DisplayMemberPath="Name"
+                              SelectedValuePath="Id"
+                              SelectedValue="{Binding ShiftId}" Margin="0,5,0,10" />
+
+                    <CheckBox IsChecked="{Binding IsActive}" Content="Активен" Margin="0,5,0,15" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="В архив" Command="{Binding ArchiveClassCommand}" Width="80" Margin="0,0,10,0"/>
+                    <Button Content="Сохранить" Command="{Binding SaveClassCommand}" Width="90"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
