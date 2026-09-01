@@ -7,6 +7,7 @@ using SchoolScheduler.App.ViewModels;
 using SchoolScheduler.App.Views;
 using SchoolScheduler.Data;
 using System.Windows.Threading;
+using SchoolScheduler.ImportExport;
 
 namespace SchoolScheduler.App;
 
@@ -94,6 +95,8 @@ public partial class App : Application
         services.AddTransient<ICatalogService, CatalogService>();
         services.AddTransient<IGroupService, GroupService>();
         services.AddTransient<ITeachingLoadService, TeachingLoadService>();
+        services.AddSingleton<IFileDialogService, FileDialogService>();
+        services.AddSingleton<TeachingLoadExcelService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();
