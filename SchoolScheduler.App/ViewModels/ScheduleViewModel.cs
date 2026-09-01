@@ -25,6 +25,7 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
 {
     private GeneratedSchedule? _schedule;
     private readonly HashSet<ScheduleLessonKey> _pinned = [];
+    private readonly HashSet<ScheduleLessonKey> _manuallyEdited = [];
     private EditSnapshot? _undo;
     public IReadOnlyList<ScheduleViewOption> ViewOptions { get; } =
         [new(ScheduleViewMode.Class, "По классу"), new(ScheduleViewMode.Teacher, "По учителю"), new(ScheduleViewMode.Room, "По кабинету")];
@@ -35,6 +36,7 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
     [ObservableProperty] private ObservableCollection<SchedulePenaltyRow> _penalties = new();
     [ObservableProperty] private bool _isGenerating;
     [ObservableProperty] private bool _canUndo;
+    [ObservableProperty] private bool _allowOptimizerToChangeManual;
     [ObservableProperty] private string _status = "Нажмите «Составить расписание».";
     [ObservableProperty] private int _quality;
 
@@ -45,7 +47,7 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
         try
         {
             IsGenerating = true; Status = "Составление расписания…"; Rows.Clear(); Penalties.Clear();
-            _schedule = await service.GenerateAsync(); _pinned.Clear(); _undo = null; CanUndo = false;
+            _schedule = await service.GenerateAsync(); _pinned.Clear(); _manuallyEdited.Clear(); _undo = null; CanUndo = false;
             if (!_schedule.Candidate.IsFeasible)
             {
                 Status = "Расписание не удалось составить.";
@@ -79,8 +81,33 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
         if (conflict is not null) return Reject(conflict);
         SaveUndo();
         _schedule = _schedule with { Candidate = _schedule.Candidate with { Lessons = changed } };
+        _manuallyEdited.Add(key);
+        if (targetKey is not null) _manuallyEdited.Add(targetKey);
         CanUndo = true; Status = target is null ? "Занятие перенесено. Конфликтов нет." : "Занятия обменены. Конфликтов нет.";
         RebuildGrid(); return true;
+    }
+
+    [RelayCommand]
+    private async Task ReoptimizeAsync()
+    {
+        if (_schedule is null || IsGenerating) return;
+        try
+        {
+            IsGenerating = true; Status = "Повторная оптимизация…";
+            var preservedKeys = AllowOptimizerToChangeManual ? _pinned : _pinned.Concat(_manuallyEdited).ToHashSet();
+            var preserved = _schedule.Candidate.Lessons
+                .Where(x => preservedKeys.Contains(new(x.LessonDemandId, x.OccurrenceIndex)))
+                .Select(x => new PreservedScheduleAssignment(x.LessonDemandId, x.OccurrenceIndex, x.TimeSlotId)).ToList();
+            var result = await service.ReoptimizeAsync(_schedule, preserved);
+            if (!result.Candidate.IsFeasible) { Reject("Не удалось повторно оптимизировать расписание с выбранными закреплениями."); return; }
+            SaveUndo(); _schedule = result;
+            if (AllowOptimizerToChangeManual) _manuallyEdited.Clear();
+            UpdateScore();
+            Status = $"Расписание повторно оптимизировано. Сохранено решений: {preserved.Count}. Качество: {Quality}/100.";
+            RebuildGrid();
+        }
+        catch (Exception ex) { dialogs.ShowError($"Не удалось повторно оптимизировать расписание: {ex.Message}"); Status = "Ошибка повторной оптимизации."; }
+        finally { IsGenerating = false; }
     }
 
     [RelayCommand]
@@ -98,6 +125,7 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
         if (_schedule is null || _undo is null) return;
         _schedule = _schedule with { Candidate = _schedule.Candidate with { Lessons = _undo.Lessons } };
         _pinned.Clear(); _pinned.UnionWith(_undo.Pinned);
+        _manuallyEdited.Clear(); _manuallyEdited.UnionWith(_undo.ManuallyEdited);
         _undo = null; CanUndo = false; Status = "Последняя операция отменена."; RebuildGrid();
     }
 
@@ -107,7 +135,7 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
     private void SaveUndo()
     {
         if (_schedule is null) return;
-        _undo = new(_schedule.Candidate.Lessons.ToList(), _pinned.ToHashSet()); CanUndo = true;
+        _undo = new(_schedule.Candidate.Lessons.ToList(), _pinned.ToHashSet(), _manuallyEdited.ToHashSet()); CanUndo = true;
     }
 
     private string? FindConflict(IReadOnlyList<ScheduledLesson> lessons)
@@ -185,5 +213,11 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
             ScheduleViewMode.Teacher => Join(schoolClass, group, subject, room), _ => Join(schoolClass, group, subject, teacher) };
     }
     private static string Join(params string?[] values) => string.Join(" · ", values.Where(x => !string.IsNullOrWhiteSpace(x)));
-    private sealed record EditSnapshot(IReadOnlyList<ScheduledLesson> Lessons, IReadOnlySet<ScheduleLessonKey> Pinned);
+    private void UpdateScore()
+    {
+        Quality = Math.Max(0, 100 - Math.Min(100, _schedule!.Candidate.Score.TotalPenalty));
+        Penalties = new(_schedule.Candidate.Score.Penalties.OrderBy(x => x.Key).Select(x => new SchedulePenaltyRow(x.Key, x.Value)));
+    }
+    private sealed record EditSnapshot(IReadOnlyList<ScheduledLesson> Lessons, IReadOnlySet<ScheduleLessonKey> Pinned,
+        IReadOnlySet<ScheduleLessonKey> ManuallyEdited);
 }

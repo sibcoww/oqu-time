@@ -41,4 +41,21 @@ public sealed class ScheduleGenerationService(IDbContextFactory<AppDbContext> fa
         var candidate = await Task.Run(() => generator.Generate(problem), cancellationToken);
         return new(problem, candidate, teachers, subjects, classes, groups, rooms, days);
     }
+
+    public async Task<GeneratedSchedule> ReoptimizeAsync(GeneratedSchedule current,
+        IReadOnlyCollection<PreservedScheduleAssignment> preservedAssignments,
+        CancellationToken cancellationToken = default)
+    {
+        var preservedConstraints = preservedAssignments
+            .Select(x => new FixedAssignmentConstraint(x.LessonDemandId, x.TimeSlotId))
+            .Cast<HardConstraint>();
+        var constraints = current.Problem.HardConstraints.Concat(preservedConstraints)
+            .DistinctBy(x => x is FixedAssignmentConstraint f ? $"{f.LessonDemandId}:{f.TimeSlotId}" : $"{x.Code}:{x.Description}")
+            .ToList();
+        var problem = current.Problem with { HardConstraints = constraints };
+        var candidate = await Task.Run(() => generator.Generate(problem), cancellationToken);
+        // Temporary preservation constraints belong only to this solver run. Keeping them in the
+        // displayed problem would silently preserve old manual edits in later, explicitly unlocked runs.
+        return current with { Candidate = candidate };
+    }
 }

@@ -64,6 +64,26 @@ public sealed class ScheduleViewModelTests
         Assert.Contains("недоступен", dialogs.LastError, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Reoptimization_PreservesManualEditsUnlessExplicitlyAllowed()
+    {
+        var demand = new LessonDemand(1, 1, new(10, 20, 30, null, 40), false, false, 5, "");
+        var slots = new[] { new TimeSlot(1, 1, 1, 1, default, default, false), new TimeSlot(2, 1, 1, 2, default, default, false) };
+        var generated = BuildSchedule([demand], slots, [new ScheduledLesson(1, 0, 1)], []);
+        var service = new StubService(generated);
+        var vm = new ScheduleViewModel(service, new StubDialogs());
+        await vm.GenerateCommand.ExecuteAsync(null);
+        Assert.True(vm.MoveLesson(new(1, 0), 1, 2));
+
+        await vm.ReoptimizeCommand.ExecuteAsync(null);
+        Assert.Single(service.LastPreserved);
+        Assert.Equal(2, service.LastPreserved.Single().TimeSlotId);
+
+        vm.AllowOptimizerToChangeManual = true;
+        await vm.ReoptimizeCommand.ExecuteAsync(null);
+        Assert.Empty(service.LastPreserved);
+    }
+
     private static GeneratedSchedule BuildSchedule(IReadOnlyList<LessonDemand> demands, IReadOnlyList<TimeSlot> slots,
         IReadOnlyList<ScheduledLesson> lessons, IReadOnlyList<HardConstraint> constraints) =>
         new(new(demands, slots, constraints, []), new(lessons, ScheduleScore.Empty, true, []),
@@ -72,7 +92,12 @@ public sealed class ScheduleViewModelTests
             [new Room { Id = 40, Name = "12", IsActive = true }, new Room { Id = 41, Name = "13", IsActive = true }], 5);
 
     private sealed class StubService(GeneratedSchedule value) : IScheduleGenerationService
-    { public Task<GeneratedSchedule> GenerateAsync(CancellationToken cancellationToken = default) => Task.FromResult(value); }
+    {
+        public IReadOnlyCollection<PreservedScheduleAssignment> LastPreserved { get; private set; } = [];
+        public Task<GeneratedSchedule> GenerateAsync(CancellationToken cancellationToken = default) => Task.FromResult(value);
+        public Task<GeneratedSchedule> ReoptimizeAsync(GeneratedSchedule current, IReadOnlyCollection<PreservedScheduleAssignment> preservedAssignments, CancellationToken cancellationToken = default)
+        { LastPreserved = preservedAssignments; return Task.FromResult(current); }
+    }
     private sealed class StubDialogs : IDialogService
     {
         public string LastError { get; private set; } = "";

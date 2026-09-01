@@ -32,6 +32,14 @@ public sealed class ScheduleGenerationServiceTests
         Assert.True(result.Candidate.IsFeasible, string.Join(Environment.NewLine, result.Candidate.Diagnostics));
         Assert.Equal(2, result.Candidate.Lessons.Count);
         Assert.Equal("7Б", Assert.Single(result.Classes).Name);
+
+        var preservedLesson = result.Candidate.Lessons[0];
+        var optimized = await service.ReoptimizeAsync(result,
+            [new(preservedLesson.LessonDemandId, preservedLesson.OccurrenceIndex, preservedLesson.TimeSlotId)]);
+        Assert.True(optimized.Candidate.IsFeasible);
+        Assert.Contains(optimized.Candidate.Lessons, x =>
+            x.LessonDemandId == preservedLesson.LessonDemandId && x.TimeSlotId == preservedLesson.TimeSlotId);
+        Assert.Empty(optimized.Problem.HardConstraints.OfType<FixedAssignmentConstraint>());
     }
 
     private static DbContextOptions<AppDbContext> Options() => new DbContextOptionsBuilder<AppDbContext>()
