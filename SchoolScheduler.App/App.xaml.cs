@@ -8,6 +8,7 @@ using SchoolScheduler.App.Views;
 using SchoolScheduler.Data;
 using System.Windows.Threading;
 using SchoolScheduler.ImportExport;
+using SchoolScheduler.Scheduling.Validation;
 
 namespace SchoolScheduler.App;
 
@@ -97,6 +98,8 @@ public partial class App : Application
         services.AddTransient<ITeachingLoadService, TeachingLoadService>();
         services.AddSingleton<IFileDialogService, FileDialogService>();
         services.AddSingleton<TeachingLoadExcelService>();
+        services.AddSingleton<PreScheduleValidator>();
+        services.AddTransient<IPreScheduleValidationService, PreScheduleValidationService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();

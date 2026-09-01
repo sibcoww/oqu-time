@@ -36,7 +36,7 @@
             <views:TeachingLoadView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:ConstraintsViewModel}">
-            <TextBlock Text="Ограничения" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
+            <views:ConstraintsView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:ScheduleViewModel}">
             <TextBlock Text="Расписание" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
