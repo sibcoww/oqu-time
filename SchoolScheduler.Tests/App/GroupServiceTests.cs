@@ -11,13 +11,16 @@ public sealed class GroupServiceTests
     public async Task TwoGroupsInSameClass_CanHaveDifferentTeacherLoads()
     {
         using var factory = new Factory(Options());
-        int classId, subjectId;
+        int classId, subjectId, firstTeacherId, secondTeacherId;
         await using (var db = factory.CreateDbContext())
         {
             var schoolClass = new SchoolClass { Name = "6Б", Parallel = 6, Letter = "Б", ShiftId = 1, MaxLessonsPerDay = 7 };
             var subject = new Subject { Name = "Английский язык", ShortName = "Англ" };
-            db.AddRange(schoolClass, subject);
+            var firstTeacher = new Teacher { FullName = "Учитель А" };
+            var secondTeacher = new Teacher { FullName = "Учитель Б" };
+            db.AddRange(schoolClass, subject, firstTeacher, secondTeacher);
             await db.SaveChangesAsync(); classId = schoolClass.Id; subjectId = subject.Id;
+            firstTeacherId = firstTeacher.Id; secondTeacherId = secondTeacher.Id;
         }
         var service = new GroupService(factory);
         var first = await service.SaveAsync(new SchoolGroup { Name = "Группа 1", ClassId = classId, SubjectId = subjectId });
@@ -26,8 +29,8 @@ public sealed class GroupServiceTests
         await using (var db = factory.CreateDbContext())
         {
             db.TeachingLoads.AddRange(
-                new TeachingLoad { ClassId = classId, GroupId = first.Id, SubjectId = subjectId, TeacherId = 10, HoursPerWeek = 3 },
-                new TeachingLoad { ClassId = classId, GroupId = second.Id, SubjectId = subjectId, TeacherId = 11, HoursPerWeek = 3 });
+                new TeachingLoad { ClassId = classId, GroupId = first.Id, SubjectId = subjectId, TeacherId = firstTeacherId, HoursPerWeek = 3 },
+                new TeachingLoad { ClassId = classId, GroupId = second.Id, SubjectId = subjectId, TeacherId = secondTeacherId, HoursPerWeek = 3 });
             await db.SaveChangesAsync();
         }
 

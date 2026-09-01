@@ -93,6 +93,7 @@ public partial class App : Application
         services.AddTransient<ITeacherService, TeacherService>();
         services.AddTransient<ICatalogService, CatalogService>();
         services.AddTransient<IGroupService, GroupService>();
+        services.AddTransient<ITeachingLoadService, TeachingLoadService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();

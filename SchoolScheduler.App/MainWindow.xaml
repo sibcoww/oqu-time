@@ -33,7 +33,7 @@
             <views:RoomsView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:TeachingLoadViewModel}">
-            <TextBlock Text="Нагрузка" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
+            <views:TeachingLoadView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:ConstraintsViewModel}">
             <TextBlock Text="Ограничения" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>

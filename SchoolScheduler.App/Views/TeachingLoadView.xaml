@@ -1,0 +1,17 @@
+<UserControl x:Class="SchoolScheduler.App.Views.TeachingLoadView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <Grid Margin="10"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+  <StackPanel Orientation="Horizontal" Margin="0,0,0,8"><Button Content="Добавить строку" Command="{Binding AddCommand}" Padding="10,5" Margin="0,0,6,0"/><Button Content="Копировать" Command="{Binding CopyCommand}" Padding="10,5" Margin="0,0,6,0"/><Button Content="Удалить" Command="{Binding DeleteCommand}" Padding="10,5" Margin="0,0,6,0"/><Button Content="Сохранить все" Command="{Binding SaveAllCommand}" Padding="10,5"/></StackPanel>
+  <DataGrid Grid.Row="1" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}" AutoGenerateColumns="False" CanUserAddRows="False">
+   <DataGrid.Columns>
+    <DataGridTemplateColumn Header="Учитель" Width="180"><DataGridTemplateColumn.CellTemplate><DataTemplate><ComboBox ItemsSource="{Binding DataContext.Teachers, RelativeSource={RelativeSource AncestorType=DataGrid}}" DisplayMemberPath="FullName" SelectedValuePath="Id" SelectedValue="{Binding TeacherId, UpdateSourceTrigger=PropertyChanged}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+    <DataGridTemplateColumn Header="Предмет" Width="150"><DataGridTemplateColumn.CellTemplate><DataTemplate><ComboBox ItemsSource="{Binding DataContext.Subjects, RelativeSource={RelativeSource AncestorType=DataGrid}}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding SubjectId}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+    <DataGridTemplateColumn Header="Класс" Width="80"><DataGridTemplateColumn.CellTemplate><DataTemplate><ComboBox ItemsSource="{Binding DataContext.Classes, RelativeSource={RelativeSource AncestorType=DataGrid}}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding ClassId}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+    <DataGridTemplateColumn Header="Группа" Width="120"><DataGridTemplateColumn.CellTemplate><DataTemplate><ComboBox ItemsSource="{Binding DataContext.Groups, RelativeSource={RelativeSource AncestorType=DataGrid}}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding GroupId}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+    <DataGridTextColumn Header="Часов/нед" Binding="{Binding HoursPerWeek, UpdateSourceTrigger=PropertyChanged}" Width="80"/>
+    <DataGridTemplateColumn Header="Кабинет" Width="100"><DataGridTemplateColumn.CellTemplate><DataTemplate><ComboBox ItemsSource="{Binding DataContext.Rooms, RelativeSource={RelativeSource AncestorType=DataGrid}}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding RoomId}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+    <DataGridCheckBoxColumn Header="Нулевой" Binding="{Binding AllowZeroLesson}" Width="70"/>
+    <DataGridTextColumn Header="Комментарий" Binding="{Binding Comment, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+   </DataGrid.Columns>
+  </DataGrid>
+ </Grid>
+</UserControl>

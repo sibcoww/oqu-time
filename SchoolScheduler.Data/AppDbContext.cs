@@ -52,6 +52,19 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(x => x.SubjectId)
             .OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<TeachingLoad>()
+            .Property(x => x.HoursPerWeek)
+            .HasPrecision(6, 2);
+        modelBuilder.Entity<TeachingLoad>().HasOne(x => x.Teacher).WithMany()
+            .HasForeignKey(x => x.TeacherId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<TeachingLoad>().HasOne(x => x.Subject).WithMany()
+            .HasForeignKey(x => x.SubjectId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<TeachingLoad>().HasOne(x => x.Class).WithMany()
+            .HasForeignKey(x => x.ClassId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<TeachingLoad>().HasOne(x => x.Group).WithMany()
+            .HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<TeachingLoad>().HasOne(x => x.Room).WithMany()
+            .HasForeignKey(x => x.RoomId).OnDelete(DeleteBehavior.SetNull);
         // Дополнительные настройки для связей, если понадобятся, можно добавить здесь
     }
 }
