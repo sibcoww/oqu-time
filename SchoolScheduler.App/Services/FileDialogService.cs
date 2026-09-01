@@ -15,4 +15,23 @@ public sealed class FileDialogService : IFileDialogService
         var dialog = new OpenFileDialog { Filter = ExcelFilter, CheckFileExists = true };
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
+    public string? ChooseBackupSavePath(string defaultFileName)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Проект SchoolScheduler (*.schoolscheduler)|*.schoolscheduler",
+            FileName = defaultFileName,
+            AddExtension = true
+        };
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+    public string? ChooseBackupOpenPath()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = "Проект SchoolScheduler (*.schoolscheduler)|*.schoolscheduler",
+            CheckFileExists = true
+        };
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
 }

@@ -87,11 +87,7 @@ public partial class App : Application
 
         // Services
         services.AddSingleton<IDialogService, DialogService>();
-        services.AddSingleton<INavigationService>(sp => 
-        {
-            var mainViewModel = sp.GetRequiredService<MainViewModel>();
-            return new NavigationService(sp, vm => mainViewModel.SetCurrentViewModel(vm));
-        });
+        services.AddSingleton<INavigationService, NavigationService>();
         services.AddTransient<ISchoolSetupService, SchoolSetupService>();
         services.AddTransient<ISchoolClassService, SchoolClassService>();
         services.AddTransient<ITeacherService, TeacherService>();
@@ -106,6 +102,7 @@ public partial class App : Application
         services.AddSingleton<SchedulingProblemFactory>();
         services.AddSingleton<IScheduleGenerator, CpSatScheduleGenerator>();
         services.AddTransient<IScheduleGenerationService, ScheduleGenerationService>();
+        services.AddTransient<IProjectBackupService, ProjectBackupService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();

@@ -13,4 +13,7 @@ public class DialogService : IDialogService
     {
         MessageBox.Show(message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
     }
+
+    public bool Confirm(string title, string message) =>
+        MessageBox.Show(message, title, MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
 }
