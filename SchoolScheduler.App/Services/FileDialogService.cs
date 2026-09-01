@@ -34,4 +34,12 @@ public sealed class FileDialogService : IFileDialogService
         };
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
+    public string? ChoosePdfSavePath(string defaultFileName)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Filter = "PDF (*.pdf)|*.pdf", FileName = defaultFileName, AddExtension = true
+        };
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
 }

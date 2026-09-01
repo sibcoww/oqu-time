@@ -6,4 +6,5 @@ public interface IFileDialogService
     string? ChooseExcelOpenPath();
     string? ChooseBackupSavePath(string defaultFileName);
     string? ChooseBackupOpenPath();
+    string? ChoosePdfSavePath(string defaultFileName);
 }

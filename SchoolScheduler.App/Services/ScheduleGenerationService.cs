@@ -23,7 +23,9 @@ public sealed class ScheduleGenerationService(IDbContextFactory<AppDbContext> fa
         var periods = await db.LessonPeriods.AsNoTracking().ToListAsync(cancellationToken);
         var teacherAvailability = await db.TeacherAvailabilities.AsNoTracking().ToListAsync(cancellationToken);
         var roomAvailability = await db.RoomAvailabilities.AsNoTracking().ToListAsync(cancellationToken);
-        var days = (await db.Schools.AsNoTracking().FirstOrDefaultAsync(cancellationToken))?.DaysPerWeek ?? 5;
+        var school = await db.Schools.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        var academicYear = await db.AcademicYears.AsNoTracking().FirstOrDefaultAsync(x => x.IsActive, cancellationToken);
+        var days = school?.DaysPerWeek ?? 5;
 
         var validation = validator.Validate(new(loads, teachers, classes, subjects, rooms, shifts, periods,
             teacherAvailability, roomAvailability, days));
@@ -33,13 +35,15 @@ public sealed class ScheduleGenerationService(IDbContextFactory<AppDbContext> fa
             var reasons = critical.Select(x => new InfeasibilityReason(x.Code, InfeasibilityCategory.InvalidDemand,
                 null, null, null, x.Message, "Исправьте исходные данные на экране «Ограничения»." )).ToList();
             return new(new([], [], [], []), new([], ScheduleScore.Empty, false,
-                reasons.Select(x => x.Message).ToList(), new(reasons)), teachers, subjects, classes, groups, rooms, days);
+                reasons.Select(x => x.Message).ToList(), new(reasons)), teachers, subjects, classes, groups, rooms, days,
+                school?.Name ?? "Школа", academicYear?.Name ?? "", shifts);
         }
 
         var problem = problemFactory.Create(new(loads, classes, subjects, periods,
             teacherAvailability, roomAvailability, days));
         var candidate = await Task.Run(() => generator.Generate(problem), cancellationToken);
-        return new(problem, candidate, teachers, subjects, classes, groups, rooms, days);
+        return new(problem, candidate, teachers, subjects, classes, groups, rooms, days,
+            school?.Name ?? "Школа", academicYear?.Name ?? "", shifts);
     }
 
     public async Task<GeneratedSchedule> ReoptimizeAsync(GeneratedSchedule current,

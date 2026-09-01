@@ -24,7 +24,8 @@ public sealed record ScheduleGridRow(int LessonNumber, ScheduleCell Monday, Sche
     ScheduleCell Thursday, ScheduleCell Friday, ScheduleCell Saturday);
 
 public partial class ScheduleViewModel(IScheduleGenerationService service, IDialogService dialogs,
-    ScheduleExcelService? excel = null, IFileDialogService? files = null) : ViewModelBase
+    ScheduleExcelService? excel = null, IFileDialogService? files = null,
+    SchedulePdfService? pdf = null, SchedulePrintService? printer = null) : ViewModelBase
 {
     private GeneratedSchedule? _schedule;
     private readonly HashSet<ScheduleLessonKey> _pinned = [];
@@ -42,6 +43,16 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
     [ObservableProperty] private bool _allowOptimizerToChangeManual;
     [ObservableProperty] private string _status = "Нажмите «Составить расписание».";
     [ObservableProperty] private int _quality;
+    public IReadOnlyList<SchedulePageOrientation> PageOrientations { get; } = Enum.GetValues<SchedulePageOrientation>();
+    public IReadOnlyList<SchedulePaperSize> PaperSizes { get; } = Enum.GetValues<SchedulePaperSize>();
+    [ObservableProperty] private SchedulePageOrientation _selectedPageOrientation = SchedulePageOrientation.Landscape;
+    [ObservableProperty] private SchedulePaperSize _selectedPaperSize = SchedulePaperSize.A4;
+    [ObservableProperty] private bool _showTeachersInPrint = true;
+    [ObservableProperty] private bool _showRoomsInPrint = true;
+    [ObservableProperty] private ObservableCollection<string> _printClasses = new(["Все классы"]);
+    [ObservableProperty] private string _selectedPrintClass = "Все классы";
+    [ObservableProperty] private ObservableCollection<string> _printShifts = new(["Все смены"]);
+    [ObservableProperty] private string _selectedPrintShift = "Все смены";
 
     [RelayCommand]
     private async Task GenerateAsync()
@@ -60,6 +71,9 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
             Quality = Math.Max(0, 100 - Math.Min(100, _schedule.Candidate.Score.TotalPenalty));
             Penalties = new(_schedule.Candidate.Score.Penalties.OrderBy(x => x.Key).Select(x => new SchedulePenaltyRow(x.Key, x.Value)));
             Status = $"Расписание составлено. Качество: {Quality}/100. Жёстких нарушений: 0.";
+            PrintClasses = new(["Все классы", .. _schedule.Classes.Where(x => x.IsActive).OrderBy(x => x.Parallel).ThenBy(x => x.Letter).Select(x => x.Name)]);
+            PrintShifts = new(["Все смены", .. (_schedule.Shifts ?? []).Select(x => x.Name)]);
+            SelectedPrintClass = PrintClasses[0]; SelectedPrintShift = PrintShifts[0];
             SelectedViewOption ??= ViewOptions[0]; RefreshResources();
         }
         catch (Exception ex) { Status = "Ошибка генерации."; dialogs.ShowError($"Не удалось составить расписание: {ex.Message}"); }
@@ -130,20 +144,7 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
         if (path is null) return;
         try
         {
-            var demands = _schedule.Problem.Demands.ToDictionary(x => x.Id);
-            var slots = _schedule.Problem.TimeSlots.ToDictionary(x => x.Id);
-            var rows = _schedule.Candidate.Lessons.Select(lesson =>
-            {
-                var demand = demands[lesson.LessonDemandId];
-                var slot = slots[lesson.TimeSlotId];
-                return new ScheduleExportRow(slot.DayOfWeek, slot.LessonNumber,
-                    _schedule.Classes.FirstOrDefault(x => x.Id == demand.Resources.ClassId)?.Name ?? $"Класс #{demand.Resources.ClassId}",
-                    demand.Resources.GroupId is int groupId ? _schedule.Groups.FirstOrDefault(x => x.Id == groupId)?.Name : null,
-                    _schedule.Subjects.FirstOrDefault(x => x.Id == demand.Resources.SubjectId)?.Name ?? $"Предмет #{demand.Resources.SubjectId}",
-                    _schedule.Teachers.FirstOrDefault(x => x.Id == demand.Resources.TeacherId)?.FullName ?? $"Учитель #{demand.Resources.TeacherId}",
-                    demand.Resources.RoomId is int roomId ? _schedule.Rooms.FirstOrDefault(x => x.Id == roomId)?.Name : null);
-            }).ToList();
-            excel.Export(path, rows);
+            excel.Export(path, BuildExportRows());
             Status = $"Расписание экспортировано: {Path.GetFileName(path)}";
         }
         catch (Exception ex)
@@ -151,6 +152,31 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
             Status = "Ошибка экспорта расписания.";
             dialogs.ShowError($"Не удалось экспортировать расписание: {ex.Message}");
         }
+    }
+
+    [RelayCommand]
+    private void ExportPdf()
+    {
+        if (_schedule is null || pdf is null || files is null) return;
+        var path = files.ChoosePdfSavePath($"Расписание-{DateTime.Today:yyyy-MM-dd}.pdf");
+        if (path is null) return;
+        try
+        {
+            pdf.Export(path, BuildPrintData(), BuildPrintSettings());
+            Status = $"PDF создан: {Path.GetFileName(path)}";
+        }
+        catch (Exception ex) { Status = "Ошибка экспорта PDF."; dialogs.ShowError($"Не удалось создать PDF: {ex.Message}"); }
+    }
+
+    [RelayCommand]
+    private void Print()
+    {
+        if (_schedule is null || printer is null) return;
+        try
+        {
+            if (printer.Print(BuildPrintData(), BuildPrintSettings())) Status = "Расписание отправлено на печать.";
+        }
+        catch (Exception ex) { Status = "Ошибка печати."; dialogs.ShowError($"Не удалось напечатать расписание: {ex.Message}"); }
     }
 
     [RelayCommand]
@@ -252,6 +278,32 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
         Quality = Math.Max(0, 100 - Math.Min(100, _schedule!.Candidate.Score.TotalPenalty));
         Penalties = new(_schedule.Candidate.Score.Penalties.OrderBy(x => x.Key).Select(x => new SchedulePenaltyRow(x.Key, x.Value)));
     }
+    private IReadOnlyList<ScheduleExportRow> BuildExportRows()
+    {
+        var demands = _schedule!.Problem.Demands.ToDictionary(x => x.Id);
+        var slots = _schedule.Problem.TimeSlots.ToDictionary(x => x.Id);
+        var shifts = (_schedule.Shifts ?? []).ToDictionary(x => x.Id, x => x.Name);
+        return _schedule.Candidate.Lessons.Select(lesson =>
+        {
+            var demand = demands[lesson.LessonDemandId]; var slot = slots[lesson.TimeSlotId];
+            return new ScheduleExportRow(slot.DayOfWeek, slot.LessonNumber,
+                _schedule.Classes.FirstOrDefault(x => x.Id == demand.Resources.ClassId)?.Name ?? $"Класс #{demand.Resources.ClassId}",
+                demand.Resources.GroupId is int groupId ? _schedule.Groups.FirstOrDefault(x => x.Id == groupId)?.Name : null,
+                _schedule.Subjects.FirstOrDefault(x => x.Id == demand.Resources.SubjectId)?.Name ?? $"Предмет #{demand.Resources.SubjectId}",
+                _schedule.Teachers.FirstOrDefault(x => x.Id == demand.Resources.TeacherId)?.FullName ?? $"Учитель #{demand.Resources.TeacherId}",
+                demand.Resources.RoomId is int roomId ? _schedule.Rooms.FirstOrDefault(x => x.Id == roomId)?.Name : null,
+                shifts.GetValueOrDefault(slot.ShiftId, $"Смена #{slot.ShiftId}"));
+        }).ToList();
+    }
+    private SchedulePrintData BuildPrintData()
+    {
+        var rows = BuildExportRows().Where(x => SelectedPrintShift == "Все смены" || x.Shift == SelectedPrintShift).ToList();
+        return new(_schedule!.SchoolName, _schedule.AcademicYearName, DateTimeOffset.Now, rows);
+    }
+    private SchedulePrintSettings BuildPrintSettings() => new(SelectedPaperSize, SelectedPageOrientation,
+        ShowTeachersInPrint, ShowRoomsInPrint,
+        SelectedPrintClass == "Все классы" ? null : new HashSet<string> { SelectedPrintClass },
+        SelectedPrintShift == "Все смены" ? null : SelectedPrintShift);
     private sealed record EditSnapshot(IReadOnlyList<ScheduledLesson> Lessons, IReadOnlySet<ScheduleLessonKey> Pinned,
         IReadOnlySet<ScheduleLessonKey> ManuallyEdited);
 }

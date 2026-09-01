@@ -6,7 +6,8 @@ namespace SchoolScheduler.App.Services;
 public sealed record GeneratedSchedule(SchedulingProblem Problem, ScheduleCandidate Candidate,
     IReadOnlyList<Teacher> Teachers, IReadOnlyList<Subject> Subjects,
     IReadOnlyList<SchoolClass> Classes, IReadOnlyList<SchoolGroup> Groups,
-    IReadOnlyList<Room> Rooms, int DaysPerWeek);
+    IReadOnlyList<Room> Rooms, int DaysPerWeek, string SchoolName = "Школа",
+    string AcademicYearName = "", IReadOnlyList<Shift>? Shifts = null);
 public sealed record PreservedScheduleAssignment(int LessonDemandId, int OccurrenceIndex, int TimeSlotId);
 
 public interface IScheduleGenerationService

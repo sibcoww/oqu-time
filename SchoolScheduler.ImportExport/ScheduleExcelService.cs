@@ -3,7 +3,7 @@ using ClosedXML.Excel;
 namespace SchoolScheduler.ImportExport;
 
 public sealed record ScheduleExportRow(int Day, int LessonNumber, string SchoolClass,
-    string? Group, string Subject, string Teacher, string? Room);
+    string? Group, string Subject, string Teacher, string? Room, string? Shift = null);
 
 public sealed class ScheduleExcelService
 {
