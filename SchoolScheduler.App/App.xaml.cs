@@ -77,9 +77,11 @@ public partial class App : Application
 
     private void ConfigureServices(IServiceCollection services)
     {
+        var databasePath = ApplicationDataPaths.PrepareDatabase();
+
         // DbContext
         services.AddDbContextFactory<AppDbContext>(options =>
-            options.UseSqlite("Data Source=school.db"));
+            options.UseSqlite($"Data Source={databasePath}"));
 
         // Views
         services.AddTransient<MainWindow>();
