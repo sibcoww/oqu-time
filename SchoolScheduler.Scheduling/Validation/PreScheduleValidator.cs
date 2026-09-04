@@ -49,6 +49,8 @@ public sealed class PreScheduleValidator
 
     private static void ValidateLessonPeriods(PreScheduleData data, List<ValidationIssue> issues)
     {
+        foreach (var duplicate in data.LessonPeriods.GroupBy(x => (x.ShiftId, x.Number)).Where(x => x.Count() > 1))
+            issues.Add(Critical("DUPLICATE_LESSON_PERIOD", $"Урок {duplicate.Key.Number} смены #{duplicate.Key.ShiftId} указан несколько раз."));
         foreach (var period in data.LessonPeriods.Where(x => x.EndTime <= x.StartTime))
             issues.Add(Critical("INVALID_LESSON_TIME", $"Урок {period.Number} смены #{period.ShiftId} должен заканчиваться позже начала."));
         foreach (var shift in data.LessonPeriods.GroupBy(x => x.ShiftId))
@@ -106,7 +108,7 @@ public sealed class PreScheduleValidator
         List<ValidationIssue> issues)
     {
         var classes = data.Classes.ToDictionary(x => x.Id);
-        var periods = data.LessonPeriods.ToDictionary(x => (x.ShiftId, x.Number));
+        var periods = data.LessonPeriods.GroupBy(x => (x.ShiftId, x.Number)).ToDictionary(x => x.Key, x => x.First());
         var resolved = fixedLessons.Select(x => classes.TryGetValue(x.ClassId, out var c) && periods.TryGetValue((c.ShiftId, x.LessonNumber), out var p)
             ? (Lesson: x, Period: p) : (Lesson: x, Period: (LessonPeriod?)null)).Where(x => x.Period is not null).ToList();
         for (var i = 0; i < resolved.Count; i++)

@@ -72,6 +72,22 @@ public sealed class PreScheduleValidatorTests
         Assert.DoesNotContain(new PreScheduleValidator().Validate(data), x => x.Code.StartsWith("FIXED_"));
     }
 
+    [Fact]
+    public void BellScheduleValidation_FindsInvalidTimeOverlapAndDuplicateNumber()
+    {
+        var periods = new LessonPeriod[]
+        {
+            new() { Id = 1, ShiftId = 1, Number = 1, StartTime = new(8,0,0), EndTime = new(8,45,0) },
+            new() { Id = 2, ShiftId = 1, Number = 2, StartTime = new(8,30,0), EndTime = new(9,0,0) },
+            new() { Id = 3, ShiftId = 1, Number = 2, StartTime = new(9,5,0), EndTime = new(9,0,0) }
+        };
+        var data = new PreScheduleData([], [], [], [], [], [new Shift { Id = 1 }], periods, [], [], 5);
+        var codes = new PreScheduleValidator().Validate(data).Select(x => x.Code).ToHashSet();
+        Assert.Contains("INVALID_LESSON_TIME", codes);
+        Assert.Contains("OVERLAPPING_LESSON_PERIODS", codes);
+        Assert.Contains("DUPLICATE_LESSON_PERIOD", codes);
+    }
+
     private static PreScheduleData EmptyData(IReadOnlyCollection<FixedLessonAssignment> fixedLessons) =>
         new([], [], [new SchoolClass { Id = 20, ShiftId = 1 }], [], [], [new Shift { Id = 1 }],
             [new LessonPeriod { Id = 1, ShiftId = 1, Number = 2, StartTime = new(8, 0, 0), EndTime = new(8, 45, 0) }],

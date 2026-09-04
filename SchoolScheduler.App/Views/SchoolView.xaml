@@ -1,1 +1,15 @@
-<UserControl x:Class="SchoolScheduler.App.Views.SchoolView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"><Grid Margin="10"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><TextBlock Text="Расписание звонков" FontSize="20" FontWeight="Bold" Margin="0,0,0,10"/><DataGrid Grid.Row="1" ItemsSource="{Binding Periods}" AutoGenerateColumns="False" CanUserAddRows="False"><DataGrid.Columns><DataGridTextColumn Header="Смена" Binding="{Binding ShiftName}" Width="*"/><DataGridTextColumn Header="Урок" Binding="{Binding Number}" IsReadOnly="True"/><DataGridTextColumn Header="Начало (ЧЧ:ММ)" Binding="{Binding StartTime, UpdateSourceTrigger=PropertyChanged}" Width="*"/><DataGridTextColumn Header="Окончание (ЧЧ:ММ)" Binding="{Binding EndTime, UpdateSourceTrigger=PropertyChanged}" Width="*"/></DataGrid.Columns></DataGrid><Button Grid.Row="2" Content="Сохранить" Command="{Binding SaveCommand}" HorizontalAlignment="Right" Padding="16,6" Margin="0,10,0,0"/></Grid></UserControl>
+<UserControl x:Class="SchoolScheduler.App.Views.SchoolView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <Grid Margin="10"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <TextBlock Text="Расписание звонков" FontSize="20" FontWeight="Bold" Margin="0,0,0,10"/>
+  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><ItemsControl ItemsSource="{Binding Shifts}"><ItemsControl.ItemTemplate><DataTemplate>
+   <StackPanel Margin="0,0,0,16"><TextBox Text="{Binding Name}" FontWeight="Bold"/><CheckBox Content="Нулевой урок" IsChecked="{Binding HasZeroLesson}" Margin="0,5"/>
+    <DataGrid ItemsSource="{Binding Periods}" AutoGenerateColumns="False" CanUserAddRows="False"><DataGrid.Columns>
+     <DataGridTextColumn Header="Урок" Binding="{Binding Number}" IsReadOnly="True"/>
+     <DataGridTextColumn Header="Начало (ЧЧ:ММ)" Binding="{Binding StartTime, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+     <DataGridTextColumn Header="Окончание (ЧЧ:ММ)" Binding="{Binding EndTime, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+    </DataGrid.Columns></DataGrid>
+   </StackPanel>
+  </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+  <Button Grid.Row="2" Content="Сохранить" Command="{Binding SaveCommand}" HorizontalAlignment="Right" Padding="16,6" Margin="0,10,0,0"/>
+ </Grid>
+</UserControl>

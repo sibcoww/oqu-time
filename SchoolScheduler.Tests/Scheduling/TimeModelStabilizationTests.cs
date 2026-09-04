@@ -1,5 +1,6 @@
 using SchoolScheduler.Core.Models;
 using SchoolScheduler.Scheduling.Domain;
+using SchoolScheduler.App.ViewModels;
 
 namespace SchoolScheduler.Tests.Scheduling;
 
@@ -51,6 +52,20 @@ public sealed class TimeModelStabilizationTests
         var slot = Assert.Single(Create(1, period).TimeSlots);
         Assert.Equal(new TimeSpan(8, 15, 0), slot.StartTime);
         Assert.Equal(new TimeSpan(9, 0, 0), slot.EndTime);
+    }
+
+    [Fact]
+    public void ZeroLesson_IsOptInAndBecomesSchedulingSlot()
+    {
+        var editor = new BellShiftEditor(1, "Shift", new(8, 0, 0));
+        editor.Periods.Add(new BellPeriodEditor(1, new(8, 0, 0), new(8, 45, 0)));
+        Assert.False(editor.HasZeroLesson);
+        Assert.DoesNotContain(editor.Periods, x => x.Number == 0);
+        editor.HasZeroLesson = true;
+        var zero = Assert.Single(editor.Periods, x => x.Number == 0);
+        var problem = Create(1, new LessonPeriod { Id = 10, ShiftId = 1, Number = 0,
+            StartTime = zero.ParsedStartTime, EndTime = zero.ParsedEndTime });
+        Assert.True(Assert.Single(problem.TimeSlots).IsZeroLesson);
     }
 
     private static SchedulingProblem Create(int days, params LessonPeriod[] periods) =>

@@ -98,6 +98,7 @@
                                         <ItemsControl.ItemTemplate><DataTemplate>
                                             <StackPanel Margin="0,0,0,16">
                                                 <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                                                <CheckBox Content="Нулевой урок" IsChecked="{Binding HasZeroLesson}" Margin="0,0,0,5"/>
                                                 <DataGrid ItemsSource="{Binding Periods}" AutoGenerateColumns="False" CanUserAddRows="False">
                                                     <DataGrid.Columns>
                                                         <DataGridTextColumn Header="Урок" Binding="{Binding Number}" IsReadOnly="True" Width="*"/>

@@ -9,36 +9,79 @@ namespace SchoolScheduler.App.ViewModels;
 
 public partial class SchoolViewModel(ISchoolSetupService service, IDialogService dialogs) : ViewModelBase
 {
-    [ObservableProperty] private ObservableCollection<BellScheduleRow> _periods = new();
-    [RelayCommand] private async Task LoadAsync()
+    [ObservableProperty] private ObservableCollection<BellScheduleShiftEditor> _shifts = new();
+
+    [RelayCommand]
+    private async Task LoadAsync()
     {
         var model = await service.GetTimeModelAsync();
-        Periods = new(model.Shifts.SelectMany(s => s.LessonPeriods.OrderBy(p => p.Number)
-            .Select(p => new BellScheduleRow(s.Id, s.Name, p.Id, p.Number, p.StartTime, p.EndTime))));
+        Shifts = new(model.Shifts.Select(x => new BellScheduleShiftEditor(x)));
     }
-    [RelayCommand] private async Task SaveAsync()
+
+    [RelayCommand]
+    private async Task SaveAsync()
     {
-        if (Periods.Any(x => !x.IsValid)) { dialogs.ShowError("Проверьте время всех уроков: окончание должно быть позже начала."); return; }
-        var shifts = Periods.GroupBy(x => new { x.ShiftId, x.ShiftName }).Select(g => new Shift
-        {
-            Id = g.Key.ShiftId, Name = g.Key.ShiftName,
-            LessonPeriods = g.Select(x => new LessonPeriod { Id = x.LessonPeriodId, ShiftId = x.ShiftId,
-                Number = x.Number, StartTime = x.ParsedStartTime, EndTime = x.ParsedEndTime }).ToList()
-        }).ToList();
-        await service.SaveBellScheduleAsync(shifts);
+        if (!Shifts.All(x => x.IsValid))
+        { dialogs.ShowError("Проверьте время: окончание должно быть позже начала, а уроки одной смены не должны пересекаться или повторяться."); return; }
+        await service.SaveBellScheduleAsync(Shifts.Select(x => x.ToModel()).ToList());
         dialogs.ShowMessage("Расписание звонков", "Изменения сохранены.");
+        await LoadAsync();
     }
 }
 
-public sealed class BellScheduleRow(int shiftId, string shiftName, int lessonPeriodId, int number,
-    TimeSpan startTime, TimeSpan endTime)
+public partial class BellScheduleShiftEditor : ObservableObject
 {
-    public int ShiftId { get; } = shiftId;
-    public string ShiftName { get; set; } = shiftName;
-    public int LessonPeriodId { get; } = lessonPeriodId;
-    public int Number { get; } = number;
-    public string StartTime { get; set; } = startTime.ToString("hh\\:mm");
-    public string EndTime { get; set; } = endTime.ToString("hh\\:mm");
+    public int ShiftId { get; }
+    public string Name { get; set; }
+    public ObservableCollection<BellScheduleRow> Periods { get; } = new();
+    [ObservableProperty] private bool _hasZeroLesson;
+
+    public BellScheduleShiftEditor(Shift shift)
+    {
+        ShiftId = shift.Id; Name = shift.Name;
+        foreach (var period in shift.LessonPeriods.OrderBy(x => x.Number)) Periods.Add(new(period));
+        _hasZeroLesson = Periods.Any(x => x.Number == 0);
+    }
+
+    partial void OnHasZeroLessonChanged(bool value)
+    {
+        var zero = Periods.FirstOrDefault(x => x.Number == 0);
+        if (value && zero is null)
+        {
+            var first = Periods.OrderBy(x => x.ParsedStartTime).FirstOrDefault();
+            var end = first?.ParsedStartTime - TimeSpan.FromMinutes(5) ?? new TimeSpan(7, 55, 0);
+            Periods.Insert(0, new BellScheduleRow(0, 0, end - TimeSpan.FromMinutes(45), end));
+        }
+        else if (!value && zero is not null) Periods.Remove(zero);
+    }
+
+    public bool IsValid
+    {
+        get
+        {
+            if (Periods.Any(x => !x.IsValid) || Periods.Select(x => x.Number).Distinct().Count() != Periods.Count) return false;
+            var ordered = Periods.OrderBy(x => x.ParsedStartTime).ToList();
+            return !ordered.Zip(ordered.Skip(1), (a, b) => a.ParsedEndTime > b.ParsedStartTime).Any(x => x);
+        }
+    }
+
+    public Shift ToModel() => new()
+    {
+        Id = ShiftId, Name = Name,
+        LessonPeriods = Periods.Select(x => new LessonPeriod { Id = x.LessonPeriodId, ShiftId = ShiftId,
+            Number = x.Number, StartTime = x.ParsedStartTime, EndTime = x.ParsedEndTime }).ToList()
+    };
+}
+
+public sealed class BellScheduleRow
+{
+    public int LessonPeriodId { get; }
+    public int Number { get; }
+    public string StartTime { get; set; }
+    public string EndTime { get; set; }
+    public BellScheduleRow(LessonPeriod period) : this(period.Id, period.Number, period.StartTime, period.EndTime) { }
+    public BellScheduleRow(int id, int number, TimeSpan start, TimeSpan end)
+    { LessonPeriodId = id; Number = number; StartTime = start.ToString("hh\\:mm"); EndTime = end.ToString("hh\\:mm"); }
     public TimeSpan ParsedStartTime => TimeSpan.ParseExact(StartTime, @"h\:mm", CultureInfo.InvariantCulture);
     public TimeSpan ParsedEndTime => TimeSpan.ParseExact(EndTime, @"h\:mm", CultureInfo.InvariantCulture);
     public bool IsValid => TimeSpan.TryParseExact(StartTime, @"h\:mm", CultureInfo.InvariantCulture, out var start) &&

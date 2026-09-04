@@ -47,9 +47,13 @@ public class SchoolSetupService(IDbContextFactory<AppDbContext> dbContextFactory
         {
             var shift = await context.Shifts.Include(x => x.LessonPeriods).SingleAsync(x => x.Id == input.Id);
             shift.Name = input.Name.Trim();
+            var retainedIds = input.LessonPeriods.Where(x => x.Id != 0).Select(x => x.Id).ToHashSet();
+            context.LessonPeriods.RemoveRange(shift.LessonPeriods.Where(x => !retainedIds.Contains(x.Id)));
             foreach (var period in input.LessonPeriods)
             {
-                var entity = shift.LessonPeriods.Single(x => x.Id == period.Id);
+                var entity = period.Id == 0 ? new LessonPeriod { ShiftId = shift.Id } :
+                    shift.LessonPeriods.Single(x => x.Id == period.Id);
+                if (period.Id == 0) context.LessonPeriods.Add(entity);
                 entity.Number = period.Number;
                 entity.StartTime = period.StartTime;
                 entity.EndTime = period.EndTime;

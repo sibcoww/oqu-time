@@ -170,6 +170,38 @@ public sealed class CpSatScheduleGeneratorTests
         Assert.Equal(0, result.Score.Penalties["USER_TIME_PREFERENCE"]);
     }
 
+    [Fact]
+    public void OverlappingCrossShiftPeriods_CannotShareTeacher()
+    {
+        var slots = CrossShiftSlots(overlap: true);
+        var problem = Problem([Demand(1, 7, 1, 1, 1), Demand(2, 7, 2, 2, 1)], slots,
+            [new ResourceAvailabilityConstraint(ResourceKind.Class, 1, new HashSet<int> { 1 }),
+             new ResourceAvailabilityConstraint(ResourceKind.Class, 2, new HashSet<int> { 2 })]);
+        Assert.False(new CpSatScheduleGenerator().Generate(problem).IsFeasible);
+    }
+
+    [Fact]
+    public void OverlappingCrossShiftPeriods_CannotShareRoom()
+    {
+        var slots = CrossShiftSlots(overlap: true);
+        var problem = Problem([Demand(1, 1, 1, 1, 1, room: 9), Demand(2, 2, 2, 2, 1, room: 9)], slots,
+            [new ResourceAvailabilityConstraint(ResourceKind.Class, 1, new HashSet<int> { 1 }),
+             new ResourceAvailabilityConstraint(ResourceKind.Class, 2, new HashSet<int> { 2 })]);
+        Assert.False(new CpSatScheduleGenerator().Generate(problem).IsFeasible);
+    }
+
+    [Fact]
+    public void NonOverlappingCrossShiftPeriods_CanShareTeacher()
+    {
+        var slots = CrossShiftSlots(overlap: false);
+        var problem = Problem([Demand(1, 7, 1, 1, 1), Demand(2, 7, 2, 2, 1)], slots,
+            [new ResourceAvailabilityConstraint(ResourceKind.Class, 1, new HashSet<int> { 1 }),
+             new ResourceAvailabilityConstraint(ResourceKind.Class, 2, new HashSet<int> { 2 })]);
+        var result = new CpSatScheduleGenerator().Generate(problem);
+        Assert.True(result.IsFeasible, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.Equal(2, result.Lessons.Count);
+    }
+
     private static LessonDemand Demand(int id, int teacher, int subject, int schoolClass, decimal hours,
         int? group = null, int? room = null, int difficulty = 1, bool allowZero = false) =>
         new(id, hours, new(teacher, subject, schoolClass, group, room), allowZero, false, difficulty, string.Empty);
@@ -177,6 +209,12 @@ public sealed class CpSatScheduleGeneratorTests
     private static List<TimeSlot> Slots(int days, int lessons) =>
         (from day in Enumerable.Range(1, days) from lesson in Enumerable.Range(1, lessons)
          select new TimeSlot((day - 1) * lessons + lesson, 1, day, lesson, TimeSpan.Zero, TimeSpan.Zero, false)).ToList();
+
+    private static List<TimeSlot> CrossShiftSlots(bool overlap) =>
+    [
+        new(1, 1, 1, 1, new(8, 0, 0), new(8, 45, 0), false),
+        new(2, 2, 1, 1, overlap ? new(8, 30, 0) : new(9, 0, 0), overlap ? new(9, 15, 0) : new(9, 45, 0), false)
+    ];
 
     private static SchedulingProblem Problem(IReadOnlyList<LessonDemand> demands, IReadOnlyList<TimeSlot> slots,
         IReadOnlyList<HardConstraint>? extra = null, IReadOnlyList<SoftConstraint>? soft = null)

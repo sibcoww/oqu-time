@@ -144,7 +144,7 @@ public partial class SetupWizardViewModel : ViewModelBase
             if (ShiftsCount < 1 || LessonsPerShift < 1) { _dialogService.ShowError("Укажите смены и количество уроков."); return false; }
             RebuildBellSchedule();
         }
-        if (CurrentStep == WizardStep.BellSchedule && BellShifts.SelectMany(x => x.Periods).Any(x => !x.IsValid))
+        if (CurrentStep == WizardStep.BellSchedule && !BellShifts.All(x => x.IsValid))
         { _dialogService.ShowError("Для каждого урока укажите время в формате ЧЧ:ММ; окончание должно быть позже начала."); return false; }
 
         return true;
@@ -156,12 +156,13 @@ public partial class SetupWizardViewModel : ViewModelBase
     private void RebuildBellSchedule()
     {
         if (ShiftsCount < 1 || LessonsPerShift < 1) return;
+        var oldZero = BellShifts.ToDictionary(x => x.Index, x => x.HasZeroLesson);
         var old = BellShifts.SelectMany(s => s.Periods.Select(p => ((s.Index, p.Number), p))).ToDictionary(x => x.Item1, x => x.p);
         BellShifts.Clear();
         for (var shiftIndex = 1; shiftIndex <= ShiftsCount; shiftIndex++)
         {
-            var shift = new BellShiftEditor(shiftIndex, $"Смена {shiftIndex}");
             var baseTime = new TimeSpan(8 + (shiftIndex - 1) * 6, 0, 0);
+            var shift = new BellShiftEditor(shiftIndex, $"Смена {shiftIndex}", baseTime);
             for (var lesson = 1; lesson <= LessonsPerShift; lesson++)
             {
                 if (old.TryGetValue((shiftIndex, lesson), out var existing)) shift.Periods.Add(existing);
@@ -171,16 +172,37 @@ public partial class SetupWizardViewModel : ViewModelBase
                     shift.Periods.Add(new BellPeriodEditor(lesson, start, start + TimeSpan.FromMinutes(45)));
                 }
             }
+            if (oldZero.GetValueOrDefault(shiftIndex)) shift.HasZeroLesson = true;
             BellShifts.Add(shift);
         }
     }
 }
 
-public sealed class BellShiftEditor(int index, string name)
+public partial class BellShiftEditor : ObservableObject
 {
-    public int Index { get; } = index;
-    public string Name { get; set; } = name;
+    private readonly TimeSpan _firstLessonStart;
+    public int Index { get; }
+    public string Name { get; set; }
     public ObservableCollection<BellPeriodEditor> Periods { get; } = new();
+    [ObservableProperty] private bool _hasZeroLesson;
+    public BellShiftEditor(int index, string name, TimeSpan firstLessonStart)
+    { Index = index; Name = name; _firstLessonStart = firstLessonStart; }
+    partial void OnHasZeroLessonChanged(bool value)
+    {
+        var existing = Periods.FirstOrDefault(x => x.Number == 0);
+        if (value && existing is null)
+            Periods.Insert(0, new BellPeriodEditor(0, _firstLessonStart - TimeSpan.FromMinutes(50), _firstLessonStart - TimeSpan.FromMinutes(5)));
+        else if (!value && existing is not null) Periods.Remove(existing);
+    }
+    public bool IsValid
+    {
+        get
+        {
+            if (Periods.Any(x => !x.IsValid) || Periods.Select(x => x.Number).Distinct().Count() != Periods.Count) return false;
+            var ordered = Periods.OrderBy(x => x.ParsedStartTime).ToList();
+            return !ordered.Zip(ordered.Skip(1), (a, b) => a.ParsedEndTime > b.ParsedStartTime).Any(x => x);
+        }
+    }
 }
 
 public sealed class BellPeriodEditor(int number, TimeSpan startTime, TimeSpan endTime)
