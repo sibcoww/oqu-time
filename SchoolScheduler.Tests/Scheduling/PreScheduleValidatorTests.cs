@@ -18,8 +18,8 @@ public sealed class PreScheduleValidatorTests
             [new Subject { Id = 1, Name = "Математика" }],
             [new Room { Id = 1, Name = "12", IsActive = false }],
             [new Shift { Id = 1, Name = "Смена 1" }],
-            [new LessonPeriod { ShiftId = 1, Number = 1 }],
-            [new TeacherAvailability { TeacherId = 1, DayOfWeek = 1, LessonNumber = 1, IsAvailable = true }],
+            [new LessonPeriod { Id = 1, ShiftId = 1, Number = 1 }],
+            [new TeacherAvailability { TeacherId = 1, DayOfWeek = 1, LessonPeriodId = 1, IsAvailable = true }],
             [], 5);
 
         var codes = new PreScheduleValidator().Validate(data).Select(x => x.Code).ToHashSet();
@@ -59,6 +59,21 @@ public sealed class PreScheduleValidatorTests
         Assert.DoesNotContain(new PreScheduleValidator().Validate(data), x => x.Code == "CLASS_OVERLOAD");
     }
 
+    [Fact]
+    public void SameLessonNumberInNonOverlappingShifts_IsNotFixedConflict()
+    {
+        FixedLessonAssignment[] fixedLessons = [new(1, 10, 20, 30, 1, 1), new(2, 10, 21, 30, 1, 1)];
+        var data = new PreScheduleData([], [],
+            [new SchoolClass { Id = 20, ShiftId = 1 }, new SchoolClass { Id = 21, ShiftId = 2 }], [], [],
+            [new Shift { Id = 1 }, new Shift { Id = 2 }],
+            [new LessonPeriod { Id = 1, ShiftId = 1, Number = 1, StartTime = new(8,0,0), EndTime = new(8,45,0) },
+             new LessonPeriod { Id = 2, ShiftId = 2, Number = 1, StartTime = new(14,0,0), EndTime = new(14,45,0) }],
+            [], [], 5, fixedLessons);
+        Assert.DoesNotContain(new PreScheduleValidator().Validate(data), x => x.Code.StartsWith("FIXED_"));
+    }
+
     private static PreScheduleData EmptyData(IReadOnlyCollection<FixedLessonAssignment> fixedLessons) =>
-        new([], [], [], [], [], [], [], [], [], 5, fixedLessons);
+        new([], [], [new SchoolClass { Id = 20, ShiftId = 1 }], [], [], [new Shift { Id = 1 }],
+            [new LessonPeriod { Id = 1, ShiftId = 1, Number = 2, StartTime = new(8, 0, 0), EndTime = new(8, 45, 0) }],
+            [], [], 5, fixedLessons);
 }

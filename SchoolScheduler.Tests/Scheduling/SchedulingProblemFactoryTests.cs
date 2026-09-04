@@ -36,9 +36,9 @@ public sealed class SchedulingProblemFactoryTests
             [new TeachingLoad { Id = 1, TeacherId = 10, SubjectId = 20, ClassId = 30, RoomId = 40, HoursPerWeek = 1 }],
             [new SchoolClass { Id = 30, ShiftId = 2, MaxLessonsPerDay = 3 }],
             [new Subject { Id = 20 }],
-            [new LessonPeriod { ShiftId = 2, Number = 1 }, new LessonPeriod { ShiftId = 2, Number = 2 }],
-            [new TeacherAvailability { TeacherId = 10, DayOfWeek = 1, LessonNumber = 2, IsAvailable = true }],
-            [new RoomAvailability { RoomId = 40, DayOfWeek = 2, LessonNumber = 1, IsAvailable = true }],
+            [new LessonPeriod { Id = 21, ShiftId = 2, Number = 1 }, new LessonPeriod { Id = 22, ShiftId = 2, Number = 2 }],
+            [new TeacherAvailability { TeacherId = 10, DayOfWeek = 1, LessonPeriodId = 22, IsAvailable = true }],
+            [new RoomAvailability { RoomId = 40, DayOfWeek = 2, LessonPeriodId = 21, IsAvailable = true }],
             2, [new FixedLessonAssignment(1, 10, 30, 40, 2, 1)]);
 
         var problem = new SchedulingProblemFactory().Create(source);

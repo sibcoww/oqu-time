@@ -33,8 +33,11 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
         }
 
         foreach (var group in problem.Demands.Select((d, i) => (Demand: d, Index: i)).GroupBy(x => x.Demand.Resources.TeacherId))
+        {
             foreach (var slot in problem.TimeSlots)
                 model.Add(LinearExpr.Sum(group.Select(x => variables[(x.Index, slot.Id)])) <= 1);
+            AddCrossShiftOverlapConstraints(model, problem.TimeSlots, group.Select(x => x.Index), variables);
+        }
         foreach (var classGroup in problem.Demands.Select((d, i) => (Demand: d, Index: i)).GroupBy(x => x.Demand.Resources.ClassId))
             foreach (var slot in problem.TimeSlots)
             {
@@ -46,8 +49,11 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
             }
         foreach (var roomGroup in problem.Demands.Select((d, i) => (Demand: d, Index: i))
                      .Where(x => x.Demand.Resources.RoomId.HasValue).GroupBy(x => x.Demand.Resources.RoomId!.Value))
+        {
             foreach (var slot in problem.TimeSlots)
                 model.Add(LinearExpr.Sum(roomGroup.Select(x => variables[(x.Index, slot.Id)])) <= 1);
+            AddCrossShiftOverlapConstraints(model, problem.TimeSlots, roomGroup.Select(x => x.Index), variables);
+        }
 
         foreach (var fixedAssignment in problem.HardConstraints.OfType<FixedAssignmentConstraint>())
         {
@@ -84,6 +90,20 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
     private static Dictionary<int, IReadOnlySet<int>> Availability(SchedulingProblem problem, ResourceKind kind) =>
         problem.HardConstraints.OfType<ResourceAvailabilityConstraint>().Where(x => x.ResourceKind == kind)
             .GroupBy(x => x.ResourceId).ToDictionary(x => x.Key, x => (IReadOnlySet<int>)x.SelectMany(v => v.AllowedTimeSlotIds).ToHashSet());
+
+    private static void AddCrossShiftOverlapConstraints(CpModel model, IReadOnlyList<TimeSlot> slots,
+        IEnumerable<int> demandIndexes, IReadOnlyDictionary<(int DemandIndex, int SlotId), BoolVar> variables)
+    {
+        var demands = demandIndexes.ToList();
+        for (var i = 0; i < slots.Count; i++)
+        for (var j = i + 1; j < slots.Count; j++)
+        {
+            var a = slots[i]; var b = slots[j];
+            if (a.DayOfWeek != b.DayOfWeek || a.ShiftId == b.ShiftId ||
+                a.StartTime >= b.EndTime || b.StartTime >= a.EndTime) continue;
+            model.Add(LinearExpr.Sum(demands.SelectMany(d => new[] { variables[(d, a.Id)], variables[(d, b.Id)] })) <= 1);
+        }
+    }
 
     private static bool IsAllowed(LessonDemand demand, TimeSlot slot,
         IReadOnlyDictionary<int, IReadOnlySet<int>> teacherAvailability,

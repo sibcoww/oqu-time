@@ -14,7 +14,7 @@ public sealed class TeacherServiceTests
         var service = new TeacherService(factory);
         var teacher = await service.SaveTeacherAsync(
             new Teacher { FullName = "Иванова А. Б." },
-            [new TeacherAvailability { DayOfWeek = 1, LessonNumber = 2, IsAvailable = false }]);
+            [new TeacherAvailability { DayOfWeek = 1, LessonPeriodId = 2, IsAvailable = false }]);
 
         var saved = await service.GetTeacherAsync(teacher.Id);
         Assert.NotNull(saved);
@@ -22,10 +22,10 @@ public sealed class TeacherServiceTests
         Assert.False(saved.Availability.Single().IsAvailable);
 
         await service.SaveTeacherAsync(saved,
-            [new TeacherAvailability { DayOfWeek = 3, LessonNumber = 4, IsAvailable = true }]);
+            [new TeacherAvailability { DayOfWeek = 3, LessonPeriodId = 4, IsAvailable = true }]);
         var edited = await service.GetTeacherAsync(teacher.Id);
         Assert.Equal(3, edited!.Availability.Single().DayOfWeek);
-        Assert.Equal(4, edited.Availability.Single().LessonNumber);
+        Assert.Equal(4, edited.Availability.Single().LessonPeriodId);
     }
 
     [Fact]
@@ -59,6 +59,9 @@ public sealed class TeacherServiceTests
             _keeper = new AppDbContext(options);
             _keeper.Database.OpenConnection();
             _keeper.Database.EnsureCreated();
+            _keeper.Shifts.Add(new Shift { Id = 1, Name = "Shift", LessonPeriods =
+                [new LessonPeriod { Id = 2, Number = 2 }, new LessonPeriod { Id = 4, Number = 4 }] });
+            _keeper.SaveChanges();
         }
 
         public AppDbContext CreateDbContext() => new(_options);

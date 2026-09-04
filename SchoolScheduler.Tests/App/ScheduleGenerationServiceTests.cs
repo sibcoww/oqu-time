@@ -18,7 +18,9 @@ public sealed class ScheduleGenerationServiceTests
         {
             var school = new School { Name = "Школа", DaysPerWeek = 2 };
             var shift = new Shift { Name = "Смена 1" }; db.AddRange(school, shift); await db.SaveChangesAsync();
-            db.LessonPeriods.AddRange(new LessonPeriod { ShiftId = shift.Id, Number = 1 }, new LessonPeriod { ShiftId = shift.Id, Number = 2 });
+            db.LessonPeriods.AddRange(
+                new LessonPeriod { ShiftId = shift.Id, Number = 1, StartTime = new(8, 0, 0), EndTime = new(8, 45, 0) },
+                new LessonPeriod { ShiftId = shift.Id, Number = 2, StartTime = new(8, 50, 0), EndTime = new(9, 35, 0) });
             var teacher = new Teacher { FullName = "Иванова А.А." };
             var subject = new Subject { Name = "Математика", ShortName = "Матем", Difficulty = 8 };
             var schoolClass = new SchoolClass { Name = "7Б", Parallel = 7, Letter = "Б", ShiftId = shift.Id, MaxLessonsPerDay = 2 };

@@ -29,7 +29,7 @@ public sealed class CatalogServiceTests
         using var factory = new Factory(Options());
         var service = new CatalogService(factory);
         var room = await service.SaveRoomAsync(new Room { Name = "Спортзал", Type = RoomType.Gym },
-            [new RoomAvailability { DayOfWeek = 2, LessonNumber = 3, IsAvailable = false }]);
+            [new RoomAvailability { DayOfWeek = 2, LessonPeriodId = 3, IsAvailable = false }]);
 
         var details = await service.GetRoomAsync(room.Id);
         Assert.Equal(RoomType.Gym, details!.Type);
@@ -48,7 +48,8 @@ public sealed class CatalogServiceTests
         private readonly DbContextOptions<AppDbContext> _options;
         private readonly AppDbContext _keeper;
         public Factory(DbContextOptions<AppDbContext> options)
-        { _options = options; _keeper = new(options); _keeper.Database.OpenConnection(); _keeper.Database.EnsureCreated(); }
+        { _options = options; _keeper = new(options); _keeper.Database.OpenConnection(); _keeper.Database.EnsureCreated();
+          _keeper.Shifts.Add(new Shift { Id = 1, Name = "Shift", LessonPeriods = [new LessonPeriod { Id = 3, Number = 3 }] }); _keeper.SaveChanges(); }
         public AppDbContext CreateDbContext() => new(_options);
         public void Dispose() => _keeper.Dispose();
     }

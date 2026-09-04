@@ -56,7 +56,7 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> factory) : IC
         await db.SaveChangesAsync();
         db.RoomAvailabilities.RemoveRange(db.RoomAvailabilities.Where(x => x.RoomId == entity.Id));
         db.RoomAvailabilities.AddRange(availability.Select(x => new RoomAvailability
-        { RoomId = entity.Id, DayOfWeek = x.DayOfWeek, LessonNumber = x.LessonNumber, IsAvailable = x.IsAvailable }));
+        { RoomId = entity.Id, DayOfWeek = x.DayOfWeek, LessonPeriodId = x.LessonPeriodId, IsAvailable = x.IsAvailable }));
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
         return entity;

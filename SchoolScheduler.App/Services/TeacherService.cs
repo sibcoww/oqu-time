@@ -45,7 +45,7 @@ public sealed class TeacherService(IDbContextFactory<AppDbContext> dbContextFact
         db.TeacherAvailabilities.AddRange(availability.Select(x => new TeacherAvailability
         {
             TeacherId = entity.Id, DayOfWeek = x.DayOfWeek,
-            LessonNumber = x.LessonNumber, IsAvailable = x.IsAvailable
+            LessonPeriodId = x.LessonPeriodId, IsAvailable = x.IsAvailable
         }));
         await db.SaveChangesAsync();
         await transaction.CommitAsync();

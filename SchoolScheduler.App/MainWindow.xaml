@@ -15,7 +15,7 @@
         <!-- Placeholders for other ViewModels will just show their name via fallback TextBlock in production, 
              for now we can let WPF use ToString() fallback for empty DataTemplates, or define them later -->
         <DataTemplate DataType="{x:Type viewmodels:SchoolViewModel}">
-            <TextBlock Text="Настройки школы" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
+            <views:SchoolView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:ClassesViewModel}">
             <views:ClassesView />

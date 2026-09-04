@@ -43,11 +43,11 @@ public sealed class SchedulingProblemFactory
         foreach (var teacher in source.Loads.Select(x => x.TeacherId).Distinct())
             hard.Add(new ResourceAvailabilityConstraint(ResourceKind.Teacher, teacher,
                 AllowedSlots(slots, source.TeacherAvailability.Where(x => x.TeacherId == teacher)
-                    .Select(x => (x.DayOfWeek, x.LessonNumber, x.IsAvailable)), null)));
+                    .Select(x => (x.DayOfWeek, x.LessonPeriodId, x.IsAvailable)), source.LessonPeriods)));
         foreach (var room in source.Loads.Where(x => x.RoomId.HasValue).Select(x => x.RoomId!.Value).Distinct())
             hard.Add(new ResourceAvailabilityConstraint(ResourceKind.Room, room,
                 AllowedSlots(slots, source.RoomAvailability.Where(x => x.RoomId == room)
-                    .Select(x => (x.DayOfWeek, x.LessonNumber, x.IsAvailable)), null)));
+                    .Select(x => (x.DayOfWeek, x.LessonPeriodId, x.IsAvailable)), source.LessonPeriods)));
         foreach (var schoolClass in classes.Values)
             hard.Add(new ResourceAvailabilityConstraint(ResourceKind.Class, schoolClass.Id,
                 slots.Where(x => x.ShiftId == schoolClass.ShiftId && x.LessonNumber <= schoolClass.MaxLessonsPerDay)
@@ -66,12 +66,15 @@ public sealed class SchedulingProblemFactory
     }
 
     private static IReadOnlySet<int> AllowedSlots(IEnumerable<TimeSlot> slots,
-        IEnumerable<(int DayOfWeek, int LessonNumber, bool IsAvailable)> availability, int? shiftId)
+        IEnumerable<(int DayOfWeek, int LessonPeriodId, bool IsAvailable)> availability,
+        IReadOnlyCollection<LessonPeriod> periods)
     {
         var values = availability.ToList();
-        var eligible = shiftId.HasValue ? slots.Where(x => x.ShiftId == shiftId) : slots;
-        if (values.Count == 0) return eligible.Select(x => x.Id).ToHashSet();
-        return eligible.Where(slot => values.Any(x => x.DayOfWeek == slot.DayOfWeek &&
-            x.LessonNumber == slot.LessonNumber && x.IsAvailable)).Select(x => x.Id).ToHashSet();
+        if (values.Count == 0) return slots.Select(x => x.Id).ToHashSet();
+        var periodKeys = periods.ToDictionary(x => x.Id, x => (x.ShiftId, x.Number));
+        var allowed = values.Where(x => x.IsAvailable && periodKeys.ContainsKey(x.LessonPeriodId))
+            .Select(x => (x.DayOfWeek, periodKeys[x.LessonPeriodId])).ToHashSet();
+        return slots.Where(slot => allowed.Contains((slot.DayOfWeek, (slot.ShiftId, slot.LessonNumber))))
+            .Select(x => x.Id).ToHashSet();
     }
 }

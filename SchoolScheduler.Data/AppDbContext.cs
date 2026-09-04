@@ -24,21 +24,32 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.Entity<TeacherAvailability>()
-            .HasIndex(x => new { x.TeacherId, x.DayOfWeek, x.LessonNumber })
+            .HasIndex(x => new { x.TeacherId, x.DayOfWeek, x.LessonPeriodId })
             .IsUnique();
         modelBuilder.Entity<TeacherAvailability>()
             .HasOne(x => x.Teacher)
             .WithMany(x => x.Availability)
             .HasForeignKey(x => x.TeacherId)
             .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<TeacherAvailability>()
+            .HasOne(x => x.LessonPeriod).WithMany()
+            .HasForeignKey(x => x.LessonPeriodId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<RoomAvailability>()
-            .HasIndex(x => new { x.RoomId, x.DayOfWeek, x.LessonNumber })
+            .HasIndex(x => new { x.RoomId, x.DayOfWeek, x.LessonPeriodId })
             .IsUnique();
         modelBuilder.Entity<RoomAvailability>()
             .HasOne(x => x.Room)
             .WithMany(x => x.Availability)
             .HasForeignKey(x => x.RoomId)
             .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<RoomAvailability>()
+            .HasOne(x => x.LessonPeriod).WithMany()
+            .HasForeignKey(x => x.LessonPeriodId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<LessonPeriod>()
+            .HasOne(x => x.Shift).WithMany(x => x.LessonPeriods)
+            .HasForeignKey(x => x.ShiftId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<LessonPeriod>()
+            .HasIndex(x => new { x.ShiftId, x.Number }).IsUnique();
         modelBuilder.Entity<SchoolGroup>()
             .HasIndex(x => new { x.ClassId, x.Name })
             .IsUnique();

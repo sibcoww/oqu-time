@@ -91,7 +91,28 @@
                             </Setter>
                         </DataTrigger>
 
-                        <!-- Step 4: Finalize -->
+                        <DataTrigger Binding="{Binding CurrentStep}" Value="BellSchedule">
+                            <Setter Property="ContentTemplate"><Setter.Value><DataTemplate>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding DataContext.BellShifts, RelativeSource={RelativeSource AncestorType=Window}}">
+                                        <ItemsControl.ItemTemplate><DataTemplate>
+                                            <StackPanel Margin="0,0,0,16">
+                                                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                                                <DataGrid ItemsSource="{Binding Periods}" AutoGenerateColumns="False" CanUserAddRows="False">
+                                                    <DataGrid.Columns>
+                                                        <DataGridTextColumn Header="Урок" Binding="{Binding Number}" IsReadOnly="True" Width="*"/>
+                                                        <DataGridTextColumn Header="Начало (ЧЧ:ММ)" Binding="{Binding StartTime, UpdateSourceTrigger=PropertyChanged}" Width="2*"/>
+                                                        <DataGridTextColumn Header="Окончание (ЧЧ:ММ)" Binding="{Binding EndTime, UpdateSourceTrigger=PropertyChanged}" Width="2*"/>
+                                                    </DataGrid.Columns>
+                                                </DataGrid>
+                                            </StackPanel>
+                                        </DataTemplate></ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </DataTemplate></Setter.Value></Setter>
+                        </DataTrigger>
+
+                        <!-- Step 5: Finalize -->
                         <DataTrigger Binding="{Binding CurrentStep}" Value="Finalize">
                             <Setter Property="ContentTemplate">
                                 <Setter.Value>

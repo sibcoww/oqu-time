@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Threading.Tasks;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -14,8 +16,8 @@ public enum WizardStep
     AcademicYear = 1,
     WorkWeek = 2,
     ShiftsCount = 3,
-    // Bell schedule can be added later or as step 5, keeping simple for this iteration
-    Finalize = 4
+    BellSchedule = 4,
+    Finalize = 5
 }
 
 public partial class SetupWizardViewModel : ViewModelBase
@@ -49,11 +51,13 @@ public partial class SetupWizardViewModel : ViewModelBase
 
     public List<int> DaysPerWeekOptions { get; } = new() { 5, 6 };
     public List<int> ShiftsCountOptions { get; } = new() { 1, 2, 3 };
+    public ObservableCollection<BellShiftEditor> BellShifts { get; } = new();
 
     public SetupWizardViewModel(ISchoolSetupService setupService, IDialogService dialogService)
     {
         _setupService = setupService;
         _dialogService = dialogService;
+        RebuildBellSchedule();
     }
 
     public bool IsFirstStep => CurrentStep == WizardStep.SchoolInfo;
@@ -104,7 +108,13 @@ public partial class SetupWizardViewModel : ViewModelBase
                 Name = AcademicYearName
             };
 
-            await _setupService.SaveSetupAsync(school, year, ShiftsCount, LessonsPerShift);
+            var shifts = BellShifts.Select(x => new Shift
+            {
+                Name = x.Name,
+                LessonPeriods = x.Periods.Select(p => new LessonPeriod
+                    { Number = p.Number, StartTime = p.ParsedStartTime, EndTime = p.ParsedEndTime }).ToList()
+            }).ToList();
+            await _setupService.SaveSetupAsync(school, year, shifts);
 
             window.DialogResult = true;
             window.Close();
@@ -129,6 +139,57 @@ public partial class SetupWizardViewModel : ViewModelBase
             return false;
         }
 
+        if (CurrentStep == WizardStep.ShiftsCount)
+        {
+            if (ShiftsCount < 1 || LessonsPerShift < 1) { _dialogService.ShowError("Укажите смены и количество уроков."); return false; }
+            RebuildBellSchedule();
+        }
+        if (CurrentStep == WizardStep.BellSchedule && BellShifts.SelectMany(x => x.Periods).Any(x => !x.IsValid))
+        { _dialogService.ShowError("Для каждого урока укажите время в формате ЧЧ:ММ; окончание должно быть позже начала."); return false; }
+
         return true;
     }
+
+    partial void OnShiftsCountChanged(int value) => RebuildBellSchedule();
+    partial void OnLessonsPerShiftChanged(int value) => RebuildBellSchedule();
+
+    private void RebuildBellSchedule()
+    {
+        if (ShiftsCount < 1 || LessonsPerShift < 1) return;
+        var old = BellShifts.SelectMany(s => s.Periods.Select(p => ((s.Index, p.Number), p))).ToDictionary(x => x.Item1, x => x.p);
+        BellShifts.Clear();
+        for (var shiftIndex = 1; shiftIndex <= ShiftsCount; shiftIndex++)
+        {
+            var shift = new BellShiftEditor(shiftIndex, $"Смена {shiftIndex}");
+            var baseTime = new TimeSpan(8 + (shiftIndex - 1) * 6, 0, 0);
+            for (var lesson = 1; lesson <= LessonsPerShift; lesson++)
+            {
+                if (old.TryGetValue((shiftIndex, lesson), out var existing)) shift.Periods.Add(existing);
+                else
+                {
+                    var start = baseTime + TimeSpan.FromMinutes((lesson - 1) * 50);
+                    shift.Periods.Add(new BellPeriodEditor(lesson, start, start + TimeSpan.FromMinutes(45)));
+                }
+            }
+            BellShifts.Add(shift);
+        }
+    }
+}
+
+public sealed class BellShiftEditor(int index, string name)
+{
+    public int Index { get; } = index;
+    public string Name { get; set; } = name;
+    public ObservableCollection<BellPeriodEditor> Periods { get; } = new();
+}
+
+public sealed class BellPeriodEditor(int number, TimeSpan startTime, TimeSpan endTime)
+{
+    public int Number { get; } = number;
+    public string StartTime { get; set; } = startTime.ToString("hh\\:mm");
+    public string EndTime { get; set; } = endTime.ToString("hh\\:mm");
+    public TimeSpan ParsedStartTime => TimeSpan.ParseExact(StartTime, @"h\:mm", CultureInfo.InvariantCulture);
+    public TimeSpan ParsedEndTime => TimeSpan.ParseExact(EndTime, @"h\:mm", CultureInfo.InvariantCulture);
+    public bool IsValid => TimeSpan.TryParseExact(StartTime, @"h\:mm", CultureInfo.InvariantCulture, out var start) &&
+        TimeSpan.TryParseExact(EndTime, @"h\:mm", CultureInfo.InvariantCulture, out var end) && end > start;
 }

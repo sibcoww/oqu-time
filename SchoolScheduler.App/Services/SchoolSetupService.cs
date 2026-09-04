@@ -1,56 +1,61 @@
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using SchoolScheduler.Core.Models;
 using SchoolScheduler.Data;
 
 namespace SchoolScheduler.App.Services;
 
-public class SchoolSetupService : ISchoolSetupService
+public class SchoolSetupService(IDbContextFactory<AppDbContext> dbContextFactory) : ISchoolSetupService
 {
-    private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
-
-    public SchoolSetupService(IDbContextFactory<AppDbContext> dbContextFactory)
-    {
-        _dbContextFactory = dbContextFactory;
-    }
-
     public async Task<bool> IsSchoolConfiguredAsync()
     {
-        using var context = await _dbContextFactory.CreateDbContextAsync();
-        // Since we are setting up locally, ensure DB is created first
+        await using var context = await dbContextFactory.CreateDbContextAsync();
         await context.Database.MigrateAsync();
         return await context.Schools.AnyAsync();
     }
 
-    public async Task SaveSetupAsync(School school, AcademicYear year, int shiftCount, int lessonsPerShift)
+    public async Task SaveSetupAsync(School school, AcademicYear year, IReadOnlyCollection<Shift> shifts)
     {
-        using var context = await _dbContextFactory.CreateDbContextAsync();
-
+        await using var context = await dbContextFactory.CreateDbContextAsync();
         context.Schools.Add(school);
-
         year.IsActive = true;
         context.AcademicYears.Add(year);
-
-        for (int i = 1; i <= shiftCount; i++)
+        foreach (var input in shifts)
         {
-            var shift = new Shift { Name = $"Смена {i}" };
+            var shift = new Shift { Name = input.Name.Trim() };
+            foreach (var period in input.LessonPeriods.OrderBy(x => x.Number))
+                shift.LessonPeriods.Add(new LessonPeriod
+                    { Number = period.Number, StartTime = period.StartTime, EndTime = period.EndTime });
             context.Shifts.Add(shift);
+        }
+        await context.SaveChangesAsync();
+    }
 
-            // Add periods for the shift
-            // Base on specification, we could wait for SaveChanges to get ShiftId or let EF core handle relationships if we added navigation properties.
-            // Since Core models don't have navigation properties right now, we need to save Shift first to get Identity, then Periods.
-            await context.SaveChangesAsync();
+    public async Task<(School School, IReadOnlyList<Shift> Shifts)> GetTimeModelAsync()
+    {
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+        var school = await context.Schools.AsNoTracking().FirstAsync();
+        var shifts = await context.Shifts.AsNoTracking().Include(x => x.LessonPeriods)
+            .OrderBy(x => x.Id).ToListAsync();
+        return (school, shifts);
+    }
 
-            for (int j = 1; j <= lessonsPerShift; j++)
+    public async Task SaveBellScheduleAsync(IReadOnlyCollection<Shift> shifts)
+    {
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        foreach (var input in shifts)
+        {
+            var shift = await context.Shifts.Include(x => x.LessonPeriods).SingleAsync(x => x.Id == input.Id);
+            shift.Name = input.Name.Trim();
+            foreach (var period in input.LessonPeriods)
             {
-                context.LessonPeriods.Add(new LessonPeriod
-                {
-                    ShiftId = shift.Id,
-                    Number = j
-                });
+                var entity = shift.LessonPeriods.Single(x => x.Id == period.Id);
+                entity.Number = period.Number;
+                entity.StartTime = period.StartTime;
+                entity.EndTime = period.EndTime;
             }
         }
-
         await context.SaveChangesAsync();
+        await transaction.CommitAsync();
     }
 }
