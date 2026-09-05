@@ -1,5 +1,7 @@
 #define AppName "SchoolScheduler"
-#define AppVersion "1.0.0"
+#ifndef AppVersion
+#define AppVersion "0.1.0-alpha"
+#endif
 #define AppPublisher "SchoolScheduler"
 #define AppExeName "SchoolScheduler.exe"
 #define PublishDir "..\artifacts\publish\win-x64"

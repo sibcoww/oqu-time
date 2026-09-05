@@ -90,6 +90,23 @@ dotnet test SchoolScheduler.slnx
 
 Готовый self-contained установщик Windows x64 создаётся в каталоге `artifacts\installer`. Установленная программа не требует отдельной установки .NET.
 
+Скрипт также создаёт portable ZIP и копию установщика в `artifacts\release`. Версию можно передать явно:
+
+```powershell
+.\installer\build-installer.ps1 -Version 0.1.0-alpha
+```
+
+## Публикация GitHub Release
+
+GitHub Actions автоматически собирает downloadable release при отправке тега вида `v*`:
+
+```powershell
+git tag v0.1.0-alpha
+git push origin v0.1.0-alpha
+```
+
+После успешной сборки на странице GitHub Releases будут доступны два файла: Windows-установщик и portable ZIP. Для тестовой сборки без создания Release workflow `Release` можно запустить вручную на вкладке Actions.
+
 Пользовательская база хранится здесь:
 
 ```text
