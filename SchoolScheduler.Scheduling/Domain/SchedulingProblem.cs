@@ -16,7 +16,7 @@ public sealed record LessonDemand(
     string Comment);
 
 public sealed record TimeSlot(int Id, int ShiftId, int DayOfWeek, int LessonNumber,
-    TimeSpan StartTime, TimeSpan EndTime, bool IsZeroLesson);
+    TimeSpan StartTime, TimeSpan EndTime, bool IsZeroLesson, int CycleWeek = 1);
 
 public sealed record ResourceRequirement(int TeacherId, int SubjectId, int ClassId,
     int? GroupId, int? RoomId);

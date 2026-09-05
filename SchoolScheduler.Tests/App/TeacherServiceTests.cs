@@ -8,6 +8,19 @@ namespace SchoolScheduler.Tests.App;
 public sealed class TeacherServiceTests
 {
     [Fact]
+    public async Task ImportTeachers_AddsOnlyNamesThatDoNotExist()
+    {
+        using var factory = new TestDbContextFactory(CreateOptions());
+        var service = new TeacherService(factory);
+        await service.SaveTeacherAsync(new Teacher { FullName = "Иванова Анна", IsActive = true }, []);
+        var added = await service.ImportTeachersAsync([" иванова анна ", "Сериков Болат", "Сериков Болат"]);
+        Assert.Equal(1, added);
+        var teachers = await service.GetTeachersAsync();
+        Assert.Equal(2, teachers.Count);
+        Assert.Contains(teachers, x => x.FullName == "Сериков Болат");
+    }
+
+    [Fact]
     public async Task SaveTeacher_PersistsAvailability_AndReplacesItOnEdit()
     {
         using var factory = new TestDbContextFactory(CreateOptions());

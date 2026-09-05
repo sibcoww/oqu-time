@@ -3,11 +3,13 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SchoolScheduler.App.Services;
 using SchoolScheduler.Core.Models;
+using SchoolScheduler.ImportExport;
 
 namespace SchoolScheduler.App.ViewModels;
 
 public partial class TeachersViewModel(ITeacherService teacherService, ISchoolSetupService setupService,
-    IDialogService dialogService) : ViewModelBase
+    IDialogService dialogService, IFileDialogService fileDialogService, SchoolDataExcelService schoolDataExcelService,
+    SchoolDataImportService schoolDataImportService) : ViewModelBase
 {
     [ObservableProperty] private ObservableCollection<Teacher> _teachers = new();
     [ObservableProperty] private Teacher? _selectedTeacher;
@@ -22,23 +24,54 @@ public partial class TeachersViewModel(ITeacherService teacherService, ISchoolSe
     [RelayCommand]
     private async Task LoadAsync()
     {
-        var time = await setupService.GetTimeModelAsync();
-        _shifts = time.Shifts; _daysPerWeek = time.School.DaysPerWeek;
-        DayNames = new(DayNamesFor(_daysPerWeek));
-        Teachers = new(await teacherService.GetTeachersAsync(SearchText));
-        if (SelectedTeacher is null) Availability = CreateRows();
+        try
+        {
+            var time = await setupService.GetTimeModelAsync();
+            _shifts = time.Shifts; _daysPerWeek = time.School.DaysPerWeek;
+            DayNames = new(DayNamesFor(_daysPerWeek));
+            Teachers = new(await teacherService.GetTeachersAsync(SearchText));
+            if (SelectedTeacher is null) Availability = CreateRows();
+        }
+        catch (Exception ex) { dialogService.ShowError($"Не удалось загрузить список учителей: {ex.Message}"); }
     }
 
     partial void OnSelectedTeacherChanged(Teacher? value) => _ = LoadSelectedAsync(value);
     private async Task LoadSelectedAsync(Teacher? teacher)
     {
         if (teacher is null) return;
-        var details = await teacherService.GetTeacherAsync(teacher.Id); if (details is null) return;
-        FullName = details.FullName; IsActive = details.IsActive;
-        Availability = CreateRows(details.Availability);
+        try
+        {
+            var details = await teacherService.GetTeacherAsync(teacher.Id); if (details is null) return;
+            FullName = details.FullName; IsActive = details.IsActive;
+            Availability = CreateRows(details.Availability);
+        }
+        catch (Exception ex) { dialogService.ShowError($"Не удалось открыть учителя: {ex.Message}"); }
     }
 
     [RelayCommand] private void Add() { SelectedTeacher = null; FullName = ""; IsActive = true; Availability = CreateRows(); }
+
+    [RelayCommand]
+    private async Task ImportExcelAsync()
+    {
+        var path = fileDialogService.ChooseExcelOpenPath();
+        if (path is null) return;
+        var result = schoolDataExcelService.Import(path);
+        if (result.Errors.Count > 0)
+        {
+            dialogService.ShowError(string.Join(Environment.NewLine, result.Errors));
+            return;
+        }
+        try
+        {
+            var summary = await schoolDataImportService.ImportAsync(result.Rows);
+            await LoadAsync();
+            dialogService.ShowMessage("Импорт данных школы",
+                $"Импорт завершён. Добавлено: учителей — {summary.Teachers}, предметов — {summary.Subjects}, " +
+                $"классов — {summary.Classes}, кабинетов — {summary.Rooms}, групп — {summary.Groups}, " +
+                $"строк нагрузки — {summary.LoadsAdded}. Обновлено строк нагрузки: {summary.LoadsUpdated}.");
+        }
+        catch (Exception ex) { dialogService.ShowError($"Не удалось импортировать учителей: {ex.Message}"); }
+    }
 
     [RelayCommand]
     private async Task SaveAsync()

@@ -37,6 +37,8 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
     [ObservableProperty] private ObservableCollection<ScheduleResourceOption> _resources = new();
     [ObservableProperty] private ScheduleResourceOption? _selectedResource;
     [ObservableProperty] private ObservableCollection<ScheduleGridRow> _rows = new();
+    [ObservableProperty] private ObservableCollection<int> _cycleWeeks = new([1]);
+    [ObservableProperty] private int _selectedCycleWeek = 1;
     [ObservableProperty] private ObservableCollection<SchedulePenaltyRow> _penalties = new();
     [ObservableProperty] private bool _isGenerating;
     [ObservableProperty] private bool _canUndo;
@@ -72,6 +74,8 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
             Penalties = new(_schedule.Candidate.Score.Penalties.OrderBy(x => x.Key).Select(x => new SchedulePenaltyRow(x.Key, x.Value)));
             Status = $"Расписание составлено. Качество: {Quality}/100. Жёстких нарушений: 0.";
             PrintClasses = new(["Все классы", .. _schedule.Classes.Where(x => x.IsActive).OrderBy(x => x.Parallel).ThenBy(x => x.Letter).Select(x => x.Name)]);
+            CycleWeeks = new(_schedule.Problem.TimeSlots.Select(x => x.CycleWeek).Distinct().Order());
+            SelectedCycleWeek = CycleWeeks[0];
             PrintShifts = new(["Все смены", .. (_schedule.Shifts ?? []).Select(x => x.Name)]);
             SelectedPrintClass = PrintClasses[0]; SelectedPrintShift = PrintShifts[0];
             SelectedViewOption ??= ViewOptions[0]; RefreshResources();
@@ -86,7 +90,7 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
         if (_pinned.Contains(key)) return Reject("Закреплённое занятие нельзя переносить. Сначала снимите закрепление.");
         var source = _schedule.Candidate.Lessons.FirstOrDefault(x => x.LessonDemandId == key.DemandId && x.OccurrenceIndex == key.OccurrenceIndex);
         var sourceSlot = source is null ? null : _schedule.Problem.TimeSlots.First(x => x.Id == source.TimeSlotId);
-        var targetSlot = _schedule.Problem.TimeSlots.FirstOrDefault(x => x.DayOfWeek == targetDay && x.LessonNumber == targetLesson && x.ShiftId == sourceSlot?.ShiftId);
+        var targetSlot = _schedule.Problem.TimeSlots.FirstOrDefault(x => x.CycleWeek == sourceSlot?.CycleWeek && x.DayOfWeek == targetDay && x.LessonNumber == targetLesson && x.ShiftId == sourceSlot?.ShiftId);
         if (targetSlot is null || source is null || source.TimeSlotId == targetSlot.Id) return false;
         var target = _schedule.Candidate.Lessons.FirstOrDefault(x => x.TimeSlotId == targetSlot.Id && MatchesSelectedResource(x.LessonDemandId));
         var targetKey = target is null ? null : new ScheduleLessonKey(target.LessonDemandId, target.OccurrenceIndex);
@@ -191,6 +195,7 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
 
     partial void OnSelectedViewOptionChanged(ScheduleViewOption? value) => RefreshResources();
     partial void OnSelectedResourceChanged(ScheduleResourceOption? value) => RebuildGrid();
+    partial void OnSelectedCycleWeekChanged(int value) => RebuildGrid();
     private bool Reject(string message) { Status = $"Конфликт: {message}"; dialogs.ShowError(message); return false; }
     private void SaveUndo()
     {
@@ -248,7 +253,7 @@ public partial class ScheduleViewModel(IScheduleGenerationService service, IDial
         if (_schedule is not null && day <= _schedule.DaysPerWeek)
         {
             var demands = _schedule.Problem.Demands.ToDictionary(x => x.Id); var slots = _schedule.Problem.TimeSlots.ToDictionary(x => x.Id);
-            foreach (var lesson in _schedule.Candidate.Lessons.Where(x => slots[x.TimeSlotId].DayOfWeek == day && slots[x.TimeSlotId].LessonNumber == lessonNumber && MatchesSelectedResource(x.LessonDemandId)))
+            foreach (var lesson in _schedule.Candidate.Lessons.Where(x => slots[x.TimeSlotId].CycleWeek == SelectedCycleWeek && slots[x.TimeSlotId].DayOfWeek == day && slots[x.TimeSlotId].LessonNumber == lessonNumber && MatchesSelectedResource(x.LessonDemandId)))
             {
                 var key = new ScheduleLessonKey(lesson.LessonDemandId, lesson.OccurrenceIndex);
                 items.Add(new() { Key = key, Text = Describe(demands[lesson.LessonDemandId]), IsPinned = _pinned.Contains(key) });

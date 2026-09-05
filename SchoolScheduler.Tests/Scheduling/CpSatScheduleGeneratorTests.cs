@@ -40,11 +40,15 @@ public sealed class CpSatScheduleGeneratorTests
     }
 
     [Fact]
-    public void FractionalHours_AreRejectedWithoutSilentRounding()
+    public void FractionalHours_AreDistributedAcrossFourWeekCycle()
     {
-        var result = new CpSatScheduleGenerator().Generate(Problem([Demand(1, 1, 1, 1, 0.5m)], Slots(5, 2)));
-        Assert.False(result.IsFeasible);
-        Assert.Contains(result.Diagnostics, x => x.Contains("правила дробных занятий"));
+        var slots = Enumerable.Range(1, 4).SelectMany(week => Slots(5, 2)
+            .Select((slot, index) => slot with { Id = (week - 1) * 10 + index + 1, CycleWeek = week })).ToList();
+        var problem = Problem([Demand(1, 1, 1, 1, 0.5m)], slots);
+        var result = new CpSatScheduleGenerator().Generate(problem);
+        Assert.True(result.IsFeasible, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.Equal(2, result.Lessons.Count);
+        Assert.Equal(2, result.Lessons.Select(x => slots.Single(s => s.Id == x.TimeSlotId).CycleWeek).Distinct().Count());
     }
 
     [Fact]

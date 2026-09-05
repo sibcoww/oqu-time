@@ -81,9 +81,9 @@ public sealed class PreScheduleValidator
         foreach (var teacher in data.Teachers.Where(x => x.IsActive))
         {
             var required = data.Loads.Where(x => x.TeacherId == teacher.Id && x.HoursPerWeek > 0).Sum(x => x.HoursPerWeek);
-            var availability = data.TeacherAvailability.Where(x => x.TeacherId == teacher.Id).ToList();
-            var available = availability.Count == 0 ? data.LessonPeriods.Count * data.DaysPerWeek :
-                availability.Count(x => x.IsAvailable && x.DayOfWeek <= data.DaysPerWeek);
+            var available = AvailableSlotCount(data.LessonPeriods, data.DaysPerWeek,
+                data.TeacherAvailability.Where(x => x.TeacherId == teacher.Id)
+                    .Select(x => (x.DayOfWeek, x.LessonPeriodId, x.IsAvailable)));
             if (required > available) issues.Add(Critical("TEACHER_SLOT_SHORTAGE", $"Учителю {teacher.FullName} нужно {required:0.##} урока, доступно {available}."));
         }
     }
@@ -95,13 +95,21 @@ public sealed class PreScheduleValidator
         foreach (var room in data.Rooms.Where(x => x.IsActive))
         {
             var required = data.Loads.Where(x => x.RoomId == room.Id && x.HoursPerWeek > 0).Sum(x => x.HoursPerWeek);
-            var availability = data.RoomAvailability.Where(x => x.RoomId == room.Id).ToList();
-            if (availability.Count > 0)
-            {
-                var available = availability.Count(x => x.IsAvailable && x.DayOfWeek <= data.DaysPerWeek);
-                if (required > available) issues.Add(Critical("ROOM_SLOT_SHORTAGE", $"Для кабинета {room.Name} нужно {required:0.##} занятия, доступно {available}."));
-            }
+            var available = AvailableSlotCount(data.LessonPeriods, data.DaysPerWeek,
+                data.RoomAvailability.Where(x => x.RoomId == room.Id)
+                    .Select(x => (x.DayOfWeek, x.LessonPeriodId, x.IsAvailable)));
+            if (required > available) issues.Add(Critical("ROOM_SLOT_SHORTAGE", $"Для кабинета {room.Name} нужно {required:0.##} занятия, доступно {available}."));
         }
+    }
+
+    private static int AvailableSlotCount(IReadOnlyCollection<LessonPeriod> periods, int daysPerWeek,
+        IEnumerable<(int DayOfWeek, int LessonPeriodId, bool IsAvailable)> availability)
+    {
+        var periodIds = periods.Select(x => x.Id).ToHashSet();
+        var unavailable = availability.Where(x => !x.IsAvailable && x.DayOfWeek >= 1 &&
+                x.DayOfWeek <= daysPerWeek && periodIds.Contains(x.LessonPeriodId))
+            .Select(x => (x.DayOfWeek, x.LessonPeriodId)).Distinct().Count();
+        return periods.Count * daysPerWeek - unavailable;
     }
 
     private static void ValidateFixedLessons(PreScheduleData data, IReadOnlyCollection<FixedLessonAssignment> fixedLessons,

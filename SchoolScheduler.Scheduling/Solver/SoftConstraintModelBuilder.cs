@@ -25,7 +25,7 @@ internal static class SoftConstraintModelBuilder
     {
         var weight = Weight<MinimizeTeacherGapsConstraint>(problem); if (weight <= 0) return;
         foreach (var teacher in Indexed(problem).GroupBy(x => x.Demand.Resources.TeacherId))
-        foreach (var slotGroup in problem.TimeSlots.GroupBy(x => (x.DayOfWeek, x.ShiftId)))
+        foreach (var slotGroup in problem.TimeSlots.GroupBy(x => (x.CycleWeek, x.DayOfWeek, x.ShiftId)))
         {
             var slots = slotGroup.OrderBy(x => x.LessonNumber).ToList();
             var occupied = slots.Select(slot => Occupancy(model, teacher.Select(x => variables[(x.Index, slot.Id)]), $"t{teacher.Key}_s{slot.Id}")).ToList();
@@ -48,17 +48,20 @@ internal static class SoftConstraintModelBuilder
         var weight = Weight<BalanceClassDayConstraint>(problem); if (weight <= 0) return;
         foreach (var schoolClass in Indexed(problem).GroupBy(x => x.Demand.Resources.ClassId))
         {
-            var counts = problem.TimeSlots.Select(x => x.DayOfWeek).Distinct().Order().Select(day =>
+            foreach (var week in problem.TimeSlots.Select(x => x.CycleWeek).Distinct())
             {
-                var count = model.NewIntVar(0, schoolClass.Count() * problem.TimeSlots.Count, $"cd{schoolClass.Key}_{day}");
+            var counts = problem.TimeSlots.Where(x => x.CycleWeek == week).Select(x => x.DayOfWeek).Distinct().Order().Select(day =>
+            {
+                var count = model.NewIntVar(0, schoolClass.Count() * problem.TimeSlots.Count, $"cd{schoolClass.Key}_{week}_{day}");
                 model.Add(count == LinearExpr.Sum(from demand in schoolClass from slot in problem.TimeSlots
-                    where slot.DayOfWeek == day select variables[(demand.Index, slot.Id)])); return count;
+                    where slot.CycleWeek == week && slot.DayOfWeek == day select variables[(demand.Index, slot.Id)])); return count;
             }).ToList();
             if (counts.Count < 2) continue;
             var max = model.NewIntVar(0, 1000, $"cmax{schoolClass.Key}"); var min = model.NewIntVar(0, 1000, $"cmin{schoolClass.Key}");
             model.AddMaxEquality(max, counts); model.AddMinEquality(min, counts);
             var spread = model.NewIntVar(0, 1000, $"cspread{schoolClass.Key}"); model.Add(spread == max - min);
             terms.Add(new("BALANCE_CLASS_DAY", spread, weight));
+            }
         }
     }
 
@@ -67,12 +70,12 @@ internal static class SoftConstraintModelBuilder
     {
         var weight = Weight<SpreadSubjectAcrossWeekConstraint>(problem); if (weight <= 0) return;
         foreach (var subject in Indexed(problem).GroupBy(x => (x.Demand.Resources.ClassId, x.Demand.Resources.SubjectId)))
-        foreach (var day in problem.TimeSlots.Select(x => x.DayOfWeek).Distinct())
+        foreach (var weekDay in problem.TimeSlots.Select(x => (x.CycleWeek, x.DayOfWeek)).Distinct())
         {
-            var count = model.NewIntVar(0, 1000, $"sd{subject.Key}_{day}");
+            var count = model.NewIntVar(0, 1000, $"sd{subject.Key}_{weekDay}");
             model.Add(count == LinearExpr.Sum(from demand in subject from slot in problem.TimeSlots
-                where slot.DayOfWeek == day select variables[(demand.Index, slot.Id)]));
-            var excess = model.NewIntVar(0, 1000, $"se{subject.Key}_{day}"); model.Add(excess >= count - 1);
+                where slot.CycleWeek == weekDay.CycleWeek && slot.DayOfWeek == weekDay.DayOfWeek select variables[(demand.Index, slot.Id)]));
+            var excess = model.NewIntVar(0, 1000, $"se{subject.Key}_{weekDay}"); model.Add(excess >= count - 1);
             terms.Add(new("SPREAD_SUBJECT_WEEK", excess, weight));
         }
     }
@@ -82,7 +85,7 @@ internal static class SoftConstraintModelBuilder
     {
         var rule = problem.SoftConstraints.OfType<AvoidConsecutiveDifficultSubjectsConstraint>().FirstOrDefault(); if (rule is null) return;
         foreach (var schoolClass in Indexed(problem).GroupBy(x => x.Demand.Resources.ClassId))
-        foreach (var dayShift in problem.TimeSlots.GroupBy(x => (x.DayOfWeek, x.ShiftId)))
+        foreach (var dayShift in problem.TimeSlots.GroupBy(x => (x.CycleWeek, x.DayOfWeek, x.ShiftId)))
         {
             var slots = dayShift.OrderBy(x => x.LessonNumber).ToList();
             var heavyDemands = schoolClass.Where(x => x.Demand.SubjectDifficulty >= rule.DifficultyThreshold).ToList();
@@ -101,7 +104,7 @@ internal static class SoftConstraintModelBuilder
         IReadOnlyDictionary<(int, int), BoolVar> variables, List<PenaltyTerm> terms)
     {
         var edgeWeight = Weight<AvoidEdgeLessonsConstraint>(problem); var earlyWeight = Weight<PreferEarlierLessonsConstraint>(problem);
-        var lastIds = problem.TimeSlots.GroupBy(x => (x.DayOfWeek, x.ShiftId)).Select(x => x.MaxBy(s => s.LessonNumber)!.Id).ToHashSet();
+        var lastIds = problem.TimeSlots.GroupBy(x => (x.CycleWeek, x.DayOfWeek, x.ShiftId)).Select(x => x.MaxBy(s => s.LessonNumber)!.Id).ToHashSet();
         foreach (var demand in Indexed(problem)) foreach (var slot in problem.TimeSlots)
         {
             var variable = variables[(demand.Index, slot.Id)];

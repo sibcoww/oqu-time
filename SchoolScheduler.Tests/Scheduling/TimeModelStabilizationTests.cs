@@ -29,7 +29,7 @@ public sealed class TimeModelStabilizationTests
     public void TeacherAvailability_IsDifferentForEachShift()
     {
         var periods = new[] { Period(11, 1, 1), Period(21, 2, 1) };
-        var source = Source(periods, [new TeacherAvailability { TeacherId = 1, DayOfWeek = 1, LessonPeriodId = 21, IsAvailable = true }], []);
+        var source = Source(periods, [new TeacherAvailability { TeacherId = 1, DayOfWeek = 1, LessonPeriodId = 11, IsAvailable = false }], []);
         var problem = new SchedulingProblemFactory().Create(source);
         var allowed = problem.HardConstraints.OfType<ResourceAvailabilityConstraint>().Single(x => x.ResourceKind == ResourceKind.Teacher).AllowedTimeSlotIds;
         Assert.All(problem.TimeSlots.Where(x => allowed.Contains(x.Id)), x => Assert.Equal(2, x.ShiftId));
@@ -39,7 +39,7 @@ public sealed class TimeModelStabilizationTests
     public void RoomAvailability_IsDifferentForEachShift()
     {
         var periods = new[] { Period(11, 1, 1), Period(21, 2, 1) };
-        var source = Source(periods, [], [new RoomAvailability { RoomId = 1, DayOfWeek = 1, LessonPeriodId = 11, IsAvailable = true }]);
+        var source = Source(periods, [], [new RoomAvailability { RoomId = 1, DayOfWeek = 1, LessonPeriodId = 21, IsAvailable = false }]);
         var problem = new SchedulingProblemFactory().Create(source);
         var allowed = problem.HardConstraints.OfType<ResourceAvailabilityConstraint>().Single(x => x.ResourceKind == ResourceKind.Room).AllowedTimeSlotIds;
         Assert.All(problem.TimeSlots.Where(x => allowed.Contains(x.Id)), x => Assert.Equal(1, x.ShiftId));

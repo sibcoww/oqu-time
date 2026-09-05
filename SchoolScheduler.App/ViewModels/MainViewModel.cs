@@ -26,15 +26,12 @@ public partial class MainViewModel : ViewModelBase
         _backups = backups;
         _files = files;
         _dialogs = dialogs;
-        NavigationItems.Add(new NavigationItem("Группы", NavigateToCommand<GroupsViewModel>()));
-
         NavigationItems.Add(new NavigationItem("Главная", NavigateToCommand<HomeViewModel>()));
         NavigationItems.Add(new NavigationItem("Школа", NavigateToCommand<SchoolViewModel>()));
         NavigationItems.Add(new NavigationItem("Классы", NavigateToCommand<ClassesViewModel>()));
         NavigationItems.Add(new NavigationItem("Учителя", NavigateToCommand<TeachersViewModel>()));
         NavigationItems.Add(new NavigationItem("Предметы", NavigateToCommand<SubjectsViewModel>()));
         NavigationItems.Add(new NavigationItem("Кабинеты", NavigateToCommand<RoomsViewModel>()));
-        NavigationItems.Add(new NavigationItem("Нагрузка", NavigateToCommand<TeachingLoadViewModel>()));
         NavigationItems.Add(new NavigationItem("Ограничения", NavigateToCommand<ConstraintsViewModel>()));
         NavigationItems.Add(new NavigationItem("Расписание", NavigateToCommand<ScheduleViewModel>()));
         NavigationItems.Add(new NavigationItem("Экспорт", NavigateToCommand<ExportViewModel>()));

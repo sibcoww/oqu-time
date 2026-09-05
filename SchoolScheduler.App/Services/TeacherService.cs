@@ -71,4 +71,16 @@ public sealed class TeacherService(IDbContextFactory<AppDbContext> dbContextFact
             .ToListAsync();
         return names.Any(x => string.Equals(x.Trim(), normalized, StringComparison.OrdinalIgnoreCase));
     }
+
+    public async Task<int> ImportTeachersAsync(IReadOnlyCollection<string> fullNames)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync();
+        var existing = (await db.Teachers.Select(x => x.FullName).ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var newNames = fullNames.Select(x => x.Trim()).Where(x => x.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase).Where(existing.Add).ToList();
+        db.Teachers.AddRange(newNames.Select(x => new Teacher { FullName = x, IsActive = true }));
+        await db.SaveChangesAsync();
+        return newNames.Count;
+    }
 }

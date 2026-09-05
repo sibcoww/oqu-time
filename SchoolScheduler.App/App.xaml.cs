@@ -18,6 +18,7 @@ namespace SchoolScheduler.App;
 public partial class App : Application
 {
     private IServiceProvider _serviceProvider = null!;
+    private bool _handlingDispatcherException;
 
     public App()
     {
@@ -26,16 +27,30 @@ public partial class App : Application
 
     private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        var dialogService = _serviceProvider?.GetService<IDialogService>();
-        if (dialogService != null)
+        if (_handlingDispatcherException)
         {
-            dialogService.ShowError($"Произошла непредвиденная ошибка:\n{e.Exception.Message}");
+            e.Handled = true;
+            return;
         }
-        else
+
+        _handlingDispatcherException = true;
+        try
         {
-            MessageBox.Show($"Критическая ошибка:\n{e.Exception.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            if (Current?.MainWindow?.IsVisible == true)
+            {
+                var dialogService = _serviceProvider?.GetService<IDialogService>();
+                if (dialogService != null)
+                    dialogService.ShowError($"Произошла непредвиденная ошибка:\n{e.Exception.Message}");
+                else
+                    MessageBox.Show($"Критическая ошибка:\n{e.Exception.Message}", "Ошибка",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
-        e.Handled = true;
+        finally
+        {
+            e.Handled = true;
+            _handlingDispatcherException = false;
+        }
     }
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -49,6 +64,9 @@ public partial class App : Application
         // Check if school setup is required
         var setupService = _serviceProvider.GetRequiredService<ISchoolSetupService>();
         bool isConfigured = await setupService.IsSchoolConfiguredAsync();
+
+        var subjectSeeder = _serviceProvider.GetRequiredService<DefaultSubjectSeeder>();
+        await subjectSeeder.EnsureCreatedAsync();
 
         if (!isConfigured)
         {
@@ -95,10 +113,14 @@ public partial class App : Application
         services.AddTransient<ISchoolClassService, SchoolClassService>();
         services.AddTransient<ITeacherService, TeacherService>();
         services.AddTransient<ICatalogService, CatalogService>();
+        services.AddTransient<DefaultSubjectSeeder>();
         services.AddTransient<IGroupService, GroupService>();
         services.AddTransient<ITeachingLoadService, TeachingLoadService>();
         services.AddSingleton<IFileDialogService, FileDialogService>();
         services.AddSingleton<TeachingLoadExcelService>();
+        services.AddSingleton<TeacherExcelService>();
+        services.AddSingleton<SchoolDataExcelService>();
+        services.AddTransient<SchoolDataImportService>();
         services.AddSingleton<ScheduleExcelService>();
         services.AddSingleton<SchedulePdfService>();
         services.AddSingleton<SchedulePrintService>();

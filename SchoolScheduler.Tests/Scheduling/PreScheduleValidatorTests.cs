@@ -88,6 +88,32 @@ public sealed class PreScheduleValidatorTests
         Assert.Contains("DUPLICATE_LESSON_PERIOD", codes);
     }
 
+    [Fact]
+    public void Capacity_CountsMissingAvailabilityAsAvailable_AndOnlyFalseAsUnavailable()
+    {
+        var periods = Enumerable.Range(0, 7).Select(n => new LessonPeriod { Id = n + 1, ShiftId = 1, Number = n }).ToArray();
+        var loads = new[] { new TeachingLoad { TeacherId = 1, SubjectId = 1, ClassId = 1, RoomId = 1, HoursPerWeek = 7 } };
+        var baseline = new PreScheduleData(loads, [new Teacher { Id = 1, IsActive = true }],
+            [new SchoolClass { Id = 1, ShiftId = 1, MaxLessonsPerDay = 7 }], [new Subject { Id = 1 }],
+            [new Room { Id = 1, IsActive = true }], [new Shift { Id = 1 }], periods,
+            Enumerable.Range(2, 6).Select(id => new TeacherAvailability { TeacherId = 1, DayOfWeek = 1, LessonPeriodId = id, IsAvailable = true }).ToArray(),
+            Enumerable.Range(2, 6).Select(id => new RoomAvailability { RoomId = 1, DayOfWeek = 1, LessonPeriodId = id, IsAvailable = true }).ToArray(), 1);
+        var baselineCodes = new PreScheduleValidator().Validate(baseline).Select(x => x.Code).ToHashSet();
+        Assert.DoesNotContain("TEACHER_SLOT_SHORTAGE", baselineCodes);
+        Assert.DoesNotContain("ROOM_SLOT_SHORTAGE", baselineCodes);
+
+        var blocked = baseline with
+        {
+            TeacherAvailability = baseline.TeacherAvailability.Append(new TeacherAvailability
+                { TeacherId = 1, DayOfWeek = 1, LessonPeriodId = 1, IsAvailable = false }).ToArray(),
+            RoomAvailability = baseline.RoomAvailability.Append(new RoomAvailability
+                { RoomId = 1, DayOfWeek = 1, LessonPeriodId = 1, IsAvailable = false }).ToArray()
+        };
+        var blockedCodes = new PreScheduleValidator().Validate(blocked).Select(x => x.Code).ToHashSet();
+        Assert.Contains("TEACHER_SLOT_SHORTAGE", blockedCodes);
+        Assert.Contains("ROOM_SLOT_SHORTAGE", blockedCodes);
+    }
+
     private static PreScheduleData EmptyData(IReadOnlyCollection<FixedLessonAssignment> fixedLessons) =>
         new([], [], [new SchoolClass { Id = 20, ShiftId = 1 }], [], [], [new Shift { Id = 1 }],
             [new LessonPeriod { Id = 1, ShiftId = 1, Number = 2, StartTime = new(8, 0, 0), EndTime = new(8, 45, 0) }],

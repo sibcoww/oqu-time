@@ -29,10 +29,12 @@ public sealed class SchedulingProblemFactory
 
         var slots = new List<TimeSlot>();
         var slotId = 1;
-        foreach (var period in source.LessonPeriods.OrderBy(x => x.ShiftId).ThenBy(x => x.Number))
-            for (var day = 1; day <= source.DaysPerWeek; day++)
-                slots.Add(new(slotId++, period.ShiftId, day, period.Number,
-                    period.StartTime, period.EndTime, period.Number == 0));
+        var cycleWeeks = source.Loads.Any(x => x.HoursPerWeek != decimal.Truncate(x.HoursPerWeek)) ? 4 : 1;
+        for (var week = 1; week <= cycleWeeks; week++)
+            foreach (var period in source.LessonPeriods.OrderBy(x => x.ShiftId).ThenBy(x => x.Number))
+                for (var day = 1; day <= source.DaysPerWeek; day++)
+                    slots.Add(new(slotId++, period.ShiftId, day, period.Number,
+                        period.StartTime, period.EndTime, period.Number == 0, week));
 
         var hard = new List<HardConstraint>
         {
@@ -54,9 +56,9 @@ public sealed class SchedulingProblemFactory
                     .Select(x => x.Id).ToHashSet()));
         foreach (var fixedLesson in source.FixedLessons ?? [])
         {
-            var slot = slots.FirstOrDefault(x => x.DayOfWeek == fixedLesson.DayOfWeek && x.LessonNumber == fixedLesson.LessonNumber &&
-                classes.TryGetValue(fixedLesson.ClassId, out var schoolClass) && x.ShiftId == schoolClass.ShiftId);
-            if (slot is not null) hard.Add(new FixedAssignmentConstraint(fixedLesson.TeachingLoadId, slot.Id));
+            foreach (var slot in slots.Where(x => x.DayOfWeek == fixedLesson.DayOfWeek && x.LessonNumber == fixedLesson.LessonNumber &&
+                         classes.TryGetValue(fixedLesson.ClassId, out var schoolClass) && x.ShiftId == schoolClass.ShiftId))
+                hard.Add(new FixedAssignmentConstraint(fixedLesson.TeachingLoadId, slot.Id));
         }
 
         SoftConstraint[] soft = [new MinimizeTeacherGapsConstraint(), new BalanceClassDayConstraint(),
@@ -69,12 +71,13 @@ public sealed class SchedulingProblemFactory
         IEnumerable<(int DayOfWeek, int LessonPeriodId, bool IsAvailable)> availability,
         IReadOnlyCollection<LessonPeriod> periods)
     {
-        var values = availability.ToList();
-        if (values.Count == 0) return slots.Select(x => x.Id).ToHashSet();
-        var periodKeys = periods.ToDictionary(x => x.Id, x => (x.ShiftId, x.Number));
-        var allowed = values.Where(x => x.IsAvailable && periodKeys.ContainsKey(x.LessonPeriodId))
+        var explicitUnavailable = availability.Where(x => !x.IsAvailable).ToList();
+        if (explicitUnavailable.Count == 0) return slots.Select(x => x.Id).ToHashSet();
+        var periodKeys = periods.Where(x => x.Id != 0).GroupBy(x => x.Id)
+            .ToDictionary(x => x.Key, x => (x.First().ShiftId, x.First().Number));
+        var unavailable = explicitUnavailable.Where(x => periodKeys.ContainsKey(x.LessonPeriodId))
             .Select(x => (x.DayOfWeek, periodKeys[x.LessonPeriodId])).ToHashSet();
-        return slots.Where(slot => allowed.Contains((slot.DayOfWeek, (slot.ShiftId, slot.LessonNumber))))
+        return slots.Where(slot => !unavailable.Contains((slot.DayOfWeek, (slot.ShiftId, slot.LessonNumber))))
             .Select(x => x.Id).ToHashSet();
     }
 }

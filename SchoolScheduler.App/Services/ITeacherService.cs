@@ -9,4 +9,5 @@ public interface ITeacherService
     Task<Teacher> SaveTeacherAsync(Teacher teacher, IReadOnlyCollection<TeacherAvailability> availability);
     Task ArchiveTeacherAsync(int id);
     Task<bool> TeacherExistsAsync(string fullName, int? excludedId = null);
+    Task<int> ImportTeachersAsync(IReadOnlyCollection<string> fullNames);
 }

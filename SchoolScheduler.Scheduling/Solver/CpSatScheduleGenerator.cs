@@ -29,7 +29,17 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
                 demandVariables.Add(variable);
                 if (!IsAllowed(demand, slot, teacherAvailability, classAvailability, roomAvailability)) model.Add(variable == 0);
             }
-            model.Add(LinearExpr.Sum(demandVariables) == decimal.ToInt32(demand.WeeklyHours));
+            var cycleWeeks = Math.Max(1, problem.TimeSlots.Max(x => x.CycleWeek));
+            var total = decimal.ToInt32(demand.WeeklyHours * cycleWeeks);
+            model.Add(LinearExpr.Sum(demandVariables) == total);
+            var minimumPerWeek = decimal.ToInt32(decimal.Floor(demand.WeeklyHours));
+            var maximumPerWeek = decimal.ToInt32(decimal.Ceiling(demand.WeeklyHours));
+            foreach (var week in problem.TimeSlots.Select(x => x.CycleWeek).Distinct())
+            {
+                var weekly = LinearExpr.Sum(problem.TimeSlots.Where(x => x.CycleWeek == week)
+                    .Select(x => variables[(demandIndex, x.Id)]));
+                model.Add(weekly >= minimumPerWeek); model.Add(weekly <= maximumPerWeek);
+            }
         }
 
         foreach (var group in problem.Demands.Select((d, i) => (Demand: d, Index: i)).GroupBy(x => x.Demand.Resources.TeacherId))
@@ -78,7 +88,7 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
         for (var demandIndex = 0; demandIndex < problem.Demands.Count; demandIndex++)
         {
             var occurrence = 0;
-            foreach (var slot in problem.TimeSlots.OrderBy(x => x.DayOfWeek).ThenBy(x => x.LessonNumber))
+            foreach (var slot in problem.TimeSlots.OrderBy(x => x.CycleWeek).ThenBy(x => x.DayOfWeek).ThenBy(x => x.LessonNumber))
                 if (solver.Value(variables[(demandIndex, slot.Id)]) == 1)
                     lessons.Add(new(problem.Demands[demandIndex].Id, occurrence++, slot.Id));
         }
@@ -99,7 +109,7 @@ public sealed class CpSatScheduleGenerator : IScheduleGenerator
         for (var j = i + 1; j < slots.Count; j++)
         {
             var a = slots[i]; var b = slots[j];
-            if (a.DayOfWeek != b.DayOfWeek || a.ShiftId == b.ShiftId ||
+            if (a.CycleWeek != b.CycleWeek || a.DayOfWeek != b.DayOfWeek || a.ShiftId == b.ShiftId ||
                 a.StartTime >= b.EndTime || b.StartTime >= a.EndTime) continue;
             model.Add(LinearExpr.Sum(demands.SelectMany(d => new[] { variables[(d, a.Id)], variables[(d, b.Id)] })) <= 1);
         }

@@ -16,17 +16,19 @@ public sealed class InfeasibilityAnalyzer
                 "Не задано ни одного временного слота.", "Настройте смены и расписание звонков."));
         foreach (var demand in problem.Demands)
         {
+            var cycleWeeks = Math.Max(1, problem.TimeSlots.Select(x => x.CycleWeek).DefaultIfEmpty(1).Max());
             if (demand.WeeklyHours <= 0)
                 reasons.Add(Reason("INVALID_HOURS", InfeasibilityCategory.InvalidDemand, null, null, demand.Id,
                     $"У нагрузки #{demand.Id} некорректное количество часов: {demand.WeeklyHours:0.##}.", "Укажите положительное количество часов."));
-            else if (demand.WeeklyHours != decimal.Truncate(demand.WeeklyHours))
+            else if (demand.WeeklyHours * cycleWeeks != decimal.Truncate(demand.WeeklyHours * cycleWeeks))
                 reasons.Add(Reason("FRACTIONAL_HOURS_UNSUPPORTED", InfeasibilityCategory.InvalidDemand, null, null, demand.Id,
-                    $"Нагрузка #{demand.Id} содержит {demand.WeeklyHours:0.##} часа, которые нельзя разместить без правила дробных занятий.",
-                    "Настройте правило дробных занятий или используйте целое число еженедельных уроков."));
+                    $"Нагрузка #{demand.Id} ({demand.WeeklyHours:0.##}) не укладывается в цикл из {cycleWeeks} недель.",
+                    "Используйте часы с шагом 0,25."));
             var allowed = AllowedSlots(problem, demand, teacherAvailability, classAvailability, roomAvailability);
-            if (demand.WeeklyHours > 0 && demand.WeeklyHours == decimal.Truncate(demand.WeeklyHours) && allowed.Count < demand.WeeklyHours)
+            var requiredSlots = demand.WeeklyHours * cycleWeeks;
+            if (demand.WeeklyHours > 0 && allowed.Count < requiredSlots)
                 reasons.Add(Reason("DEMAND_SLOT_SHORTAGE", InfeasibilityCategory.Availability, null, null, demand.Id,
-                    $"Нагрузке #{demand.Id} требуется {demand.WeeklyHours:0} уроков, но подходит только {allowed.Count} слотов.",
+                    $"Нагрузке #{demand.Id} требуется {requiredSlots:0} уроков за цикл, но подходит только {allowed.Count} слотов.",
                     "Расширьте доступность учителя/кабинета, смену класса или уменьшите часы."));
         }
 
@@ -52,7 +54,8 @@ public sealed class InfeasibilityAnalyzer
         };
         foreach (var resource in groups)
         {
-            var required = resource.Where(x => x.WeeklyHours > 0).Sum(x => x.WeeklyHours);
+            var cycleWeeks = Math.Max(1, problem.TimeSlots.Select(x => x.CycleWeek).DefaultIfEmpty(1).Max());
+            var required = resource.Where(x => x.WeeklyHours > 0).Sum(x => x.WeeklyHours) * cycleWeeks;
             var available = availability.TryGetValue(resource.Key, out var slots) ? slots.Count : problem.TimeSlots.Count;
             if (required <= available) continue;
             var label = kind == ResourceKind.Teacher ? "Учителю" : "Кабинету";
